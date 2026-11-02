@@ -8,6 +8,8 @@
 window.FReD = window.FReD || {};
 
 FReD.reportGenerator = {
+  outcomeCaveat: 'Outcome labels are a starting point, not a verdict. They depend on how replication authors describe their results. A failed replication does not by itself show that the original finding was false or the original study flawed: a replication can also fail by chance, because of low power or problems in its own conduct, or because conditions, situations, or contexts differed.',
+
   // Outcome symbols - using text characters that respond to CSS color
   // Note: getSymbol() method provides theme-aware symbols
   symbols: {
@@ -271,6 +273,7 @@ FReD.reportGenerator = {
     }
 
     html += '</table>';
+    html += `<p>${this.outcomeCaveat}</p>`;
 
     return html;
   },
@@ -295,6 +298,8 @@ FReD.reportGenerator = {
 | ${this.symbols.inconclusive.text} | *Inconclusive:* Results inconclusive. |
 | ${this.symbols.not_coded.text} | *Not Coded:* Not yet coded. |
 ${retractedDOIs.size > 0 ? '| [RETRACTED] | *Retracted:* Article has been retracted. |\n' : ''}
+${this.outcomeCaveat}
+
 `;
 
     // Add retraction section if there are retracted articles
