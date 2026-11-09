@@ -141,7 +141,7 @@ FReD.reportGenerator = {
     let html = `
       <h1>Replication Report</h1>
       <p><strong>Generated:</strong> ${new Date().toLocaleDateString()}</p>
-      <p><em>Based on data from the FORRT Library of Replication Attempts (FLoRA)</em></p>
+      <p><em>Based on data from the FORRT Library of Reproduction and Replication Attempts (FLoRA)</em></p>
 
       ${legend}
     `;
@@ -283,7 +283,7 @@ FReD.reportGenerator = {
 
 **Generated:** ${new Date().toLocaleDateString()}
 
-*Based on data from the FORRT Library of Replication Attempts (FLoRA)*
+*Based on data from the FORRT Library of Reproduction and Replication Attempts (FLoRA)*
 
 ### Legend
 
