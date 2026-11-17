@@ -8,7 +8,7 @@
 window.FReD = window.FReD || {};
 
 FReD.reportGenerator = {
-  outcomeCaveat: 'Treat outcome labels as a starting point, not a verdict on the original. They depend on how replication authors describe their results. A failed replication does not by itself show that the original finding was false or the original study flawed: a replication can also fail by chance, because of low power or problems in its own conduct, or because conditions, situations, or contexts differed.',
+  outcomeCaveat: 'Labels follow how the replication authors describe their own results, and they do not say why a replication failed. Chance, low power, flaws in the replication, or differences in sample and setting can all produce a failure, so one failed replication does not show that the original finding was false. Follow the links to the reports before relying on a label.',
 
   // Outcome symbols - using text characters that respond to CSS color
   // Note: getSymbol() method provides theme-aware symbols
