@@ -235,7 +235,7 @@ FReD.explorer = {
         }
       }
 
-      noteHtml += '<br>Treat outcome labels as a starting point, not a verdict on the original. They depend on the selected success criterion (for Reported Success, on how replication authors describe their results). A failed replication does not by itself show that the original finding was false or the original study flawed: a replication can also fail by chance, because of low power or problems in its own conduct, or because conditions, situations, or contexts differed.';
+      noteHtml += '<br>A failure under any criterion can come from chance, low power, flaws in the replication, or differences in sample and setting, so on its own it does not show that the original finding was false. Open the studies before drawing conclusions.';
 
       noteEl.innerHTML = noteHtml;
     }
