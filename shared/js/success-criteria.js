@@ -66,7 +66,7 @@ FReD.successCriteria = {
       label: 'Reported Success',
       shortLabel: 'Reported',
       hasOSNotSignificant: false,
-      note: 'Replication success was assessed based on the outcome reported in the replication study itself. This uses the pre-coded "result" field from the FReD database.'
+      note: 'Replication success was assessed based on how the replication authors described their results, as coded in the FReD database. Where this coding is missing, the calculated outcome stored in the database is used instead.'
     }
   },
 
