@@ -1,17 +1,18 @@
-/* FReD Annotator - Specific Styles */
+/* FReD Annotator - Specific Styles
+   Colours come from shared/css/theme.css tokens; dark mode is handled there. */
 
 /* Text area styling */
 #reference-input {
-  font-family: monospace;
-  font-size: 0.875rem;
+  font-family: var(--font-mono);
+  font-size: var(--fs-4);
   resize: vertical;
-  background: var(--fred-bg-card);
-  color: var(--fred-text);
-  border-color: var(--fred-border);
+  background: var(--white);
+  color: var(--text);
+  border-color: var(--border);
 }
 
 #reference-input::placeholder {
-  color: var(--fred-text-muted);
+  color: var(--text-muted);
 }
 
 /* File upload styling */
@@ -21,53 +22,62 @@ input[type="file"].form-control {
 
 /* DOI preview */
 #doi-list {
-  font-family: monospace;
-  font-size: 0.8125rem;
-  background: var(--fred-bg-alt);
-  color: var(--fred-text);
+  font-family: var(--font-mono);
+  font-size: var(--fs-4);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
   padding: 1rem;
-  border-radius: 0.5rem;
+  border-radius: var(--radius);
   margin: 0;
+}
+
+#markdown-source {
+  font-family: var(--font-mono);
+  background: var(--surface);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
 }
 
 /* Report view styling */
 .report-view {
-  font-size: 0.9375rem;
+  font-size: var(--fs-5);
   line-height: 1.7;
   max-height: 600px;
   overflow-y: auto;
   padding: 1.5rem;
-  background: var(--fred-bg-card);
-  color: var(--fred-text);
-  border: 1px solid var(--fred-border);
-  border-radius: 0.5rem;
+  background: var(--white);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
 }
 
 .report-view h1 {
-  font-size: 1.5rem;
-  color: var(--fred-primary);
-  border-bottom: 2px solid var(--fred-primary);
+  font-size: var(--fs-7);
+  color: var(--primary);
+  border-bottom: 1px solid var(--primary-soft);
   padding-bottom: 0.5rem;
   margin-bottom: 1rem;
 }
 
 .report-view h2 {
-  font-size: 1.25rem;
+  font-size: 18px;
   margin-top: 1.5rem;
 }
 
 .report-view h3 {
-  font-size: 1.125rem;
+  font-size: var(--fs-6);
   margin-top: 1.25rem;
 }
 
 .report-view h4 {
-  font-size: 1rem;
+  font-size: var(--fs-5);
   margin-top: 1rem;
 }
 
 .report-view h5 {
-  font-size: 0.9375rem;
+  font-size: var(--fs-5);
   margin-top: 0.75rem;
   margin-bottom: 0.25rem;
 }
@@ -85,39 +95,47 @@ input[type="file"].form-control {
   border-collapse: collapse;
   width: 100%;
   margin: 1rem 0;
-  font-size: 0.875rem;
+  font-size: var(--fs-4);
 }
 
 .report-view th,
 .report-view td {
-  border: 1px solid var(--fred-border);
+  border: 1px solid var(--border-light);
   padding: 0.5rem;
   text-align: left;
 }
 
 .report-view th {
-  background: var(--fred-bg-alt);
+  background: var(--surface);
+  color: var(--text);
 }
 
-/* Result icons */
+/* Result icons. The report generator also writes fallback colours inline so a
+   copied report keeps them; these class rules win on the page and follow the theme. */
 .result-icon {
   font-size: 1.25rem;
 }
 
 .result-success {
-  color: darkgreen;
+  color: var(--success-light) !important;
 }
 
 .result-failure {
-  color: darkred;
+  color: var(--error) !important;
 }
 
 .result-mixed {
-  color: #856404;
+  color: var(--warning-text) !important;
+  font-weight: 700;
 }
 
-.result-na {
-  color: #6c757d;
+.result-na,
+.report-view small.text-muted {
+  color: var(--text-muted) !important;
+}
+
+.retracted-warning-text {
+  color: var(--error) !important;
 }
 
 /* Coverage summary bar */
@@ -130,53 +148,47 @@ input[type="file"].form-control {
   max-height: 120px;
 }
 
-/* Selected row styling - override DataTables blue selection */
-table.dataTable tbody tr.selected,
-table.dataTable tbody tr.selected td {
-  background-color: rgba(166, 40, 40, 0.15) !important;
-}
-
-/* DataTables select plugin overrides for dark mode */
-table.dataTable.display tbody tr.selected > .sorting_1,
-table.dataTable.order-column.stripe tbody tr.selected > .sorting_1 {
-  background-color: rgba(166, 40, 40, 0.15) !important;
-}
-
-/* Outcome badge in table */
+/* Outcome badge in table (Atlas pill) */
 .outcome-badge {
   display: inline-block;
-  padding: 0.25em 0.5em;
-  font-size: 0.75rem;
-  font-weight: 500;
-  border-radius: 0.25rem;
+  padding: 0.15rem 0.55rem;
+  font-size: var(--fs-2);
+  font-weight: 600;
+  line-height: 1.4;
+  border-radius: var(--radius-full);
+  border: 1px solid transparent;
   min-width: 80px;
   text-align: center;
 }
 
 .outcome-badge.success {
-  background: var(--fred-success);
-  color: #155724;
+  background: var(--success-bg);
+  border-color: var(--success-border);
+  color: var(--success-light);
 }
 
 .outcome-badge.failure {
-  background: var(--fred-failure);
-  color: #721c24;
+  background: var(--error-bg);
+  border-color: var(--error-border);
+  color: var(--error);
 }
 
 .outcome-badge.mixed {
-  background: var(--fred-mixed);
-  color: #856404;
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+  color: var(--warning-text);
 }
 
 .outcome-badge.not-coded {
-  background: var(--fred-not-coded);
-  color: #383d41;
+  background: var(--surface-alt);
+  border-color: var(--border);
+  color: var(--text-muted);
 }
 
 /* Retracted study warning */
 .retracted-warning {
-  color: #721c24;
-  font-weight: bold;
+  color: var(--error);
+  font-weight: 700;
 }
 
 .retracted-warning::before {
@@ -186,49 +198,35 @@ table.dataTable.order-column.stripe tbody tr.selected > .sorting_1 {
 /* Retraction badge */
 .retraction-badge {
   display: inline-block;
-  padding: 0.15em 0.4em;
-  font-size: 0.7rem;
-  font-weight: 600;
+  padding: 0.1rem 0.45rem;
+  font-size: var(--fs-1);
+  font-weight: 700;
   text-transform: uppercase;
-  background: #991B1B;
-  color: #fff;
-  border-radius: 0.25rem;
-  letter-spacing: 0.02em;
+  background: var(--error-bg);
+  border: 1px solid var(--error-border);
+  color: var(--error);
+  border-radius: var(--radius-full);
+  letter-spacing: 0.4px;
   vertical-align: middle;
 }
 
 .retraction-count {
-  color: #991B1B;
+  color: var(--error);
 }
 
 /* Retracted item in list */
 .retracted-item {
-  border-left: 3px solid #991B1B;
+  border-left: 3px solid var(--error);
   padding-left: 0.75rem;
   margin-bottom: 0.75rem;
 }
 
-/* Retraction check section styling */
-.retraction-check-section {
-  border: 1px solid var(--fred-border);
-}
-
-[data-theme="dark"] .retraction-check-section {
-  background: rgba(30, 41, 59, 0.5);
-  border-color: var(--fred-border);
-}
-
-[data-theme="dark"] .retraction-badge {
-  background: #B91C1C;
-  color: #FEE2E2;
-}
-
-[data-theme="dark"] .retraction-count {
-  color: #F87171;
-}
-
-[data-theme="dark"] .retracted-item {
-  border-left-color: #B91C1C;
+/* Inset sections inside the input card */
+.retraction-check-section,
+.doi-lookup-section {
+  background: var(--surface);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius);
 }
 
 /* Print styles */
@@ -283,228 +281,40 @@ table.dataTable.order-column.stripe tbody tr.selected > .sorting_1 {
   }
 }
 
-/* Dark mode support */
-
-/* Text area - matches page background with visible border */
-[data-theme="dark"] #reference-input {
-  background: var(--fred-bg);
-  color: var(--fred-text);
-  border: 1px solid var(--fred-border);
-}
-
-[data-theme="dark"] #reference-input:focus {
-  border-color: var(--fred-primary);
-  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15);
-}
-
-[data-theme="dark"] #reference-input::placeholder {
-  color: var(--fred-text-muted);
-}
-
-/* DOI preview */
-[data-theme="dark"] #doi-list {
-  background: var(--fred-bg);
-  color: var(--fred-text-secondary);
-  border: 1px solid var(--fred-border);
-}
-
-/* Tables - ensure readability */
-[data-theme="dark"] table.dataTable {
-  color: var(--fred-text-secondary);
-}
-
-[data-theme="dark"] table.dataTable thead th {
-  background: #1E293B;
-  color: #F1F5F9;
-  border-bottom: 2px solid #475569;
-}
-
-[data-theme="dark"] table.dataTable tbody td {
-  color: #CBD5E1;
-  border-bottom: 1px solid #334155;
-}
-
-[data-theme="dark"] table.dataTable tbody td a {
-  color: var(--fred-accent-teal);
-}
-
-[data-theme="dark"] table.dataTable tbody td a:hover {
-  color: #7FE0E3;
-}
-
-[data-theme="dark"] table.dataTable tbody tr:hover {
-  background-color: rgba(255, 255, 255, 0.05);
-}
-
-[data-theme="dark"] .dataTables_wrapper .dataTables_filter input,
-[data-theme="dark"] .dataTables_wrapper .dataTables_length select {
-  background: var(--fred-bg);
-  color: var(--fred-text);
-  border: 1px solid var(--fred-border);
-}
-
-[data-theme="dark"] .dataTables_wrapper .dataTables_filter input:focus {
-  border-color: var(--fred-primary);
-  box-shadow: 0 0 0 3px rgba(225, 29, 72, 0.15);
-}
-
-[data-theme="dark"] .dataTables_wrapper .dataTables_info {
-  color: var(--fred-text-muted);
-}
-
-[data-theme="dark"] .dataTables_paginate .paginate_button {
-  color: var(--fred-text-secondary) !important;
-  border: 1px solid var(--fred-border);
-  background: transparent;
-}
-
-[data-theme="dark"] .dataTables_paginate .paginate_button:hover:not(.current):not(.disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  color: var(--fred-text) !important;
-}
-
-[data-theme="dark"] .dataTables_paginate .paginate_button.current {
-  background: var(--fred-primary) !important;
-  color: white !important;
-  border-color: var(--fred-primary);
-}
-
-/* Outcome badges - high contrast for dark mode */
-[data-theme="dark"] .outcome-badge.success {
-  background: #166534;
-  color: #BBF7D0;
-}
-
-[data-theme="dark"] .outcome-badge.failure {
-  background: #991B1B;
-  color: #FECACA;
-}
-
-[data-theme="dark"] .outcome-badge.mixed {
-  background: #A16207;  /* Dark yellow */
-  color: #FEF9C3;
-}
-
-[data-theme="dark"] .outcome-badge.not-coded {
-  background: #334155;
-  color: #94A3B8;
-}
-
-/* Result icons in report */
-[data-theme="dark"] .result-success {
-  color: #6EBF6E;
-}
-
-[data-theme="dark"] .result-failure {
-  color: #E87070;
-}
-
-[data-theme="dark"] .result-mixed {
-  color: #F0B080;
-}
-
-[data-theme="dark"] .result-na {
-  color: #9A9A9A;
-}
-
-/* Report view */
-[data-theme="dark"] .report-view {
-  background: var(--fred-bg-card);
-  color: var(--fred-text-secondary);
-  border: 1px solid var(--fred-border);
-}
-
-[data-theme="dark"] .report-view h1 {
-  color: var(--fred-text);
-  border-bottom-color: var(--fred-primary);
-}
-
-[data-theme="dark"] .report-view h2,
-[data-theme="dark"] .report-view h3,
-[data-theme="dark"] .report-view h4,
-[data-theme="dark"] .report-view h5 {
-  color: var(--fred-text);
-}
-
-[data-theme="dark"] .report-view th {
-  background: #1E293B;
-  color: #F1F5F9;
-}
-
-[data-theme="dark"] .report-view td {
-  color: #CBD5E1;
-}
-
-[data-theme="dark"] .report-view a {
-  color: var(--fred-accent-teal);
-}
-
-[data-theme="dark"] #markdown-source {
-  background: var(--fred-bg);
-  color: var(--fred-text-secondary);
-  border: 1px solid var(--fred-border);
-}
-
-/* Selected row styling for dark mode - muted selection */
-[data-theme="dark"] table.dataTable tbody tr.selected,
-[data-theme="dark"] table.dataTable tbody tr.selected td,
-[data-theme="dark"] table.dataTable.display tbody tr.selected > .sorting_1,
-[data-theme="dark"] table.dataTable.order-column.stripe tbody tr.selected > .sorting_1 {
-  background-color: rgba(148, 163, 184, 0.15) !important;  /* Muted slate blue */
-}
-
-/* Make table text colors consistent between results and database tables */
-[data-theme="dark"] #results-table tbody td,
-[data-theme="dark"] #database-table tbody td {
-  color: var(--fred-text-secondary);
-}
-
-[data-theme="dark"] #results-table tbody td a,
-[data-theme="dark"] #database-table tbody td a {
-  color: var(--fred-accent-teal);
-}
-
 /* Row details styling */
 .row-details {
   padding: 1rem;
-  background: var(--fred-bg-alt);
-  border-left: 3px solid var(--fred-primary);
+  background: var(--surface);
+  border-left: 3px solid var(--primary);
+  border-radius: 0 var(--radius) var(--radius) 0;
 }
 
 .row-details h4 {
   margin: 0 0 0.5rem 0;
-  font-size: 0.9rem;
-  color: var(--fred-text);
+  font-size: var(--fs-5);
+  color: var(--text);
 }
 
 .row-details ul {
   margin: 0;
   padding-left: 1.25rem;
-  font-size: 0.875rem;
+  font-size: var(--fs-4);
 }
 
 .row-details li {
   margin-bottom: 0.5rem;
-  color: var(--fred-text-secondary);
+  color: var(--text-secondary);
 }
 
 .row-details a {
-  color: var(--fred-primary);
-}
-
-[data-theme="dark"] .row-details {
-  background: rgba(30, 41, 59, 0.5);
-}
-
-[data-theme="dark"] .row-details a {
-  color: var(--fred-accent-teal);
+  color: var(--primary);
 }
 
 /* Details toggle button */
 td.details-control {
   cursor: pointer;
   text-align: center;
-  color: var(--fred-text-muted);
+  color: var(--text-muted);
   width: 20px;
 }
 
@@ -513,7 +323,7 @@ td.details-control::before {
   font-weight: bold;
   font-size: 1.25rem;
   display: inline-block;
-  transition: transform 0.2s ease;
+  transition: transform var(--transition);
 }
 
 tr.shown td.details-control::before {
@@ -521,10 +331,10 @@ tr.shown td.details-control::before {
 }
 
 tr.shown td.details-control {
-  color: var(--fred-primary);
+  color: var(--primary);
 }
 
-/* Custom file upload button */
+/* Custom file upload button (secondary button style) */
 .file-upload-wrapper {
   display: flex;
   align-items: center;
@@ -537,83 +347,50 @@ tr.shown td.details-control {
 
 .custom-file-upload {
   display: inline-block;
-  padding: 0.5rem 1rem;
+  padding: 0.45rem 1.1rem;
   cursor: pointer;
-  background-color: transparent;
-  border: 1px solid var(--fred-primary);
-  color: var(--fred-primary);
-  border-radius: 0.25rem;
-  font-weight: 500;
-  font-size: 0.875rem;
-  transition: all 0.2s;
+  background-color: var(--white);
+  border: 1px solid var(--primary-soft);
+  color: var(--primary);
+  border-radius: var(--radius);
+  font-weight: 600;
+  font-size: var(--fs-4);
+  transition: background-color var(--transition-fast), border-color var(--transition-fast);
 }
 
 .custom-file-upload:hover {
-  background-color: rgba(63, 5, 8, 0.1);
-}
-
-[data-theme="dark"] .custom-file-upload {
-  border-color: var(--fred-primary);
-  color: var(--fred-primary);
-}
-
-[data-theme="dark"] .custom-file-upload:hover {
-  background-color: rgba(225, 29, 72, 0.15);
+  background-color: var(--primary-faint);
+  border-color: var(--primary);
 }
 
 .file-chosen {
-  color: var(--fred-text-muted);
-  font-size: 0.875rem;
-}
-
-/* Legacy file input styling (for browsers that don't support custom) */
-[data-theme="dark"] input[type="file"].form-control {
-  background: var(--fred-bg);
-  border: 1px solid var(--fred-border);
-  color: var(--fred-text-secondary);
+  color: var(--text-muted);
+  font-size: var(--fs-4);
 }
 
 /* DOI Lookup section */
-.doi-lookup-section {
-  border: 1px solid var(--fred-border);
-}
-
 .doi-lookup-section input[type="email"] {
-  background: var(--fred-bg-card);
-  color: var(--fred-text);
-  border: 1px solid var(--fred-border);
-  border-radius: 0.25rem;
+  font-family: var(--font-body);
+  background: var(--white);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
 }
 
 .doi-lookup-section input[type="email"]:focus {
-  border-color: var(--fred-primary);
+  border-color: var(--primary);
   outline: none;
-  box-shadow: 0 0 0 2px rgba(166, 40, 40, 0.15);
+  box-shadow: 0 0 0 3px rgba(133, 57, 83, 0.12);
 }
 
 .doi-lookup-section input[type="email"]::placeholder {
-  color: var(--fred-text-muted);
-  font-size: 0.8125rem;
-}
-
-[data-theme="dark"] .doi-lookup-section {
-  background: rgba(30, 41, 59, 0.5);
-  border-color: var(--fred-border);
-}
-
-[data-theme="dark"] .doi-lookup-section input[type="email"] {
-  background: var(--fred-bg);
-  color: var(--fred-text);
-  border-color: var(--fred-border);
-}
-
-[data-theme="dark"] .doi-lookup-section input[type="email"]:focus {
-  border-color: var(--fred-primary);
-  box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.15);
+  color: var(--text-muted);
+  font-size: var(--fs-4);
 }
 
 /* Button disabled state */
 #btn-lookup-dois:disabled {
-  opacity: 0.7;
+  opacity: 0.4;
   cursor: not-allowed;
 }

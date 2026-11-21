@@ -70,7 +70,7 @@ FReD.charts.scatterplot = {
           x: [],
           y: [],
           text: [],
-          color: colors[outcome] || colors[outcomeReport] || '#C8C8C8'
+          color: colors[outcome] || colors[outcomeReport] || colors['Not calculable']
         };
       }
 
@@ -114,7 +114,7 @@ FReD.charts.scatterplot = {
         marker: {
           color: data.color,
           size: Math.max(6, 12 - Math.log10(validStudies.length) * 2),
-          line: { color: 'rgba(50,50,50,0.5)', width: 1 }
+          line: { color: FReD.themeToggle.token('--white', '#ffffff'), width: 1 }
         },
         hovertemplate: '%{text}<extra></extra>'
       });
@@ -127,7 +127,7 @@ FReD.charts.scatterplot = {
       type: 'scatter',
       mode: 'lines',
       name: 'x = y',
-      line: { color: 'rgba(128,128,128,0.5)', dash: 'solid' },
+      line: { color: FReD.themeToggle.token('--border', '#d0d1d1'), dash: 'solid' },
       hoverinfo: 'skip',
       showlegend: false
     });
@@ -139,12 +139,13 @@ FReD.charts.scatterplot = {
       type: 'scatter',
       mode: 'lines',
       name: 'y = 0',
-      line: { color: 'rgba(0,0,0,0.3)', dash: 'dash' },
+      line: { color: FReD.themeToggle.token('--text-faint', '#696969'), dash: 'dash' },
       hoverinfo: 'skip',
       showlegend: false
     });
 
-    // Create rug plots for significance
+    // Create rug plots for significance (colours from theme tokens)
+    const rug = FReD.successCriteria.rugColors;
     const sigOriginal = validStudies.filter(s => s.p_o != null && s.p_o < 0.05);
     const nsOriginal = validStudies.filter(s => s.p_o != null && s.p_o >= 0.05);
     const sigReplication = validStudies.filter(s => s.p_r != null && s.p_r < 0.05);
@@ -157,7 +158,7 @@ FReD.charts.scatterplot = {
         y: sigOriginal.map(() => -0.52),
         type: 'scatter',
         mode: 'markers',
-        marker: { symbol: 'line-ns', size: 12, color: '#4DCCD0', line: { width: 2, color: '#4DCCD0' } },
+        marker: { symbol: 'line-ns', size: 12, color: rug.significant, line: { width: 2, color: rug.significant } },
         hoverinfo: 'skip',
         showlegend: false
       });
@@ -169,7 +170,7 @@ FReD.charts.scatterplot = {
         y: nsOriginal.map(() => -0.52),
         type: 'scatter',
         mode: 'markers',
-        marker: { symbol: 'line-ns', size: 12, color: '#FA948C', line: { width: 2, color: '#FA948C' } },
+        marker: { symbol: 'line-ns', size: 12, color: rug.notSignificant, line: { width: 2, color: rug.notSignificant } },
         hoverinfo: 'skip',
         showlegend: false
       });
@@ -182,7 +183,7 @@ FReD.charts.scatterplot = {
         y: sigReplication.map(s => s.es_r),
         type: 'scatter',
         mode: 'markers',
-        marker: { symbol: 'line-ew', size: 12, color: '#4DCCD0', line: { width: 2, color: '#4DCCD0' } },
+        marker: { symbol: 'line-ew', size: 12, color: rug.significant, line: { width: 2, color: rug.significant } },
         hoverinfo: 'skip',
         showlegend: false
       });
@@ -194,7 +195,7 @@ FReD.charts.scatterplot = {
         y: nsReplication.map(s => s.es_r),
         type: 'scatter',
         mode: 'markers',
-        marker: { symbol: 'line-ew', size: 12, color: '#FA948C', line: { width: 2, color: '#FA948C' } },
+        marker: { symbol: 'line-ew', size: 12, color: rug.notSignificant, line: { width: 2, color: rug.notSignificant } },
         hoverinfo: 'skip',
         showlegend: false
       });

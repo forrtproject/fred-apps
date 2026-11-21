@@ -68,10 +68,8 @@ FReD.charts.trends = {
     const outcomes = [...new Set(withDecade.map(d => d.outcome))];
     const decades = Object.keys(decadeOutcomes).sort();
 
-    // Get colors - include mixed color explicitly
+    // Get colors (theme tokens via successCriteria)
     const colors = FReD.successCriteria.getColorsForCriterion(criterion);
-    colors['mixed'] = '#DAA520';  // Goldenrod - darker yellow
-    colors['Mixed'] = '#DAA520';
 
     // Create traces
     const traces = outcomes.map(outcome => ({
@@ -80,8 +78,8 @@ FReD.charts.trends = {
       type: 'scatter',
       mode: 'lines+markers',
       name: FReD.utils.capFirstLetter(outcome),
-      line: { color: colors[outcome] || colors[FReD.utils.capFirstLetter(outcome)] || '#888' },
-      marker: { color: colors[outcome] || colors[FReD.utils.capFirstLetter(outcome)] || '#888' }
+      line: { color: colors[outcome] || colors[FReD.utils.capFirstLetter(outcome)] || colors['Not calculable'] },
+      marker: { color: colors[outcome] || colors[FReD.utils.capFirstLetter(outcome)] || colors['Not calculable'] }
     }));
 
     // Get theme-aware layout
@@ -233,11 +231,8 @@ FReD.charts.trends = {
       return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
     });
 
-    // Get colors - include mixed color explicitly
+    // Get colors (theme tokens via successCriteria)
     const colors = FReD.successCriteria.getColorsForCriterion(criterion);
-    // Ensure mixed has the right color (dark yellow)
-    colors['mixed'] = '#DAA520';  // Goldenrod - darker yellow
-    colors['Mixed'] = '#DAA520';
 
     // Create traces
     const traces = outcomes.map(outcome => ({
@@ -247,7 +242,7 @@ FReD.charts.trends = {
       orientation: 'h',
       name: FReD.utils.capFirstLetter(outcome),
       marker: {
-        color: colors[outcome] || colors[FReD.utils.capFirstLetter(outcome)] || '#888'
+        color: colors[outcome] || colors[FReD.utils.capFirstLetter(outcome)] || colors['Not calculable']
       }
     }));
 
