@@ -752,7 +752,7 @@ FReD.annotator = {
     const manuallySelected = [...this.selectedDOIs].filter(doi => !this.inputDOIs.has(doi)).length;
 
     // Build the text note
-    let noteHtml = '<p style="font-size: 0.9rem; color: var(--fred-text); margin: 0;">';
+    let noteHtml = '<p style="font-size: 0.9rem; color: var(--text); margin: 0;">';
 
     if (this.inputDOIs.size > 0) {
       noteHtml += `Of <strong>${this.inputDOIs.size}</strong> provided DOI${this.inputDOIs.size !== 1 ? 's' : ''}, <strong>${inputWithReplications}</strong> ${inputWithReplications === 1 ? 'has' : 'have'} replications in FLoRA`;
@@ -870,21 +870,16 @@ FReD.annotator = {
 
     const total = this.matchedStudies.length;
 
-    // Use theme-aware colors that match badges
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    // Theme-aware colours from shared/css/theme.css tokens (same as the badges)
+    const token = (name, fallback) => FReD.themeToggle.token(name, fallback);
 
     // Fixed order: success, mixed, failed, other
     const categoryOrder = ['success', 'mixed', 'failed', 'other'];
-    const categoryColors = isDark ? {
-      success: '#166534',
-      mixed: '#A16207',
-      failed: '#991B1B',
-      other: '#334155'
-    } : {
-      success: '#8FBC8F',
-      mixed: '#EAB308',
-      failed: '#F08080',
-      other: '#C8C8C8'
+    const categoryColors = {
+      success: token('--outcome-success', '#16a34a'),
+      mixed: token('--outcome-mixed', '#b8860b'),
+      failed: token('--outcome-failure', '#b42318'),
+      other: token('--outcome-na', '#d0d1d1')
     };
     const categoryNames = {
       success: 'successful',
@@ -911,7 +906,7 @@ FReD.annotator = {
           text: showLabel ? [`${percentage}%`] : [''],
           textposition: 'inside',
           insidetextanchor: 'middle',
-          textfont: { color: '#fff', size: 12 },
+          textfont: { color: FReD.themeToggle.textOn(categoryColors[category]), size: 12 },
           hoverinfo: showLabel ? 'none' : 'text',
           hovertext: [`${categoryNames[category]}: ${percentage}%`],
           marker: { color: categoryColors[category] }
@@ -920,7 +915,7 @@ FReD.annotator = {
 
     // Get theme-aware layout
     const themeLayout = FReD.themeToggle ? FReD.themeToggle.getPlotlyLayout() : {};
-    const textColor = themeLayout.font?.color || '#333';
+    const textColor = themeLayout.font?.color;
 
     const layout = {
       barmode: 'stack',

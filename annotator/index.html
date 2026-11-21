@@ -6,13 +6,13 @@
   <title>FLoRA Annotator - Annotate Reading Lists</title>
   <link rel="icon" type="image/png" href="../shared/images/favicon.png">
 
+  <!-- DataTables CSS (vendor first so the theme overrides it) -->
+  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/select/1.7.0/css/select.dataTables.min.css">
+
   <!-- Stylesheets -->
   <link rel="stylesheet" href="../shared/css/theme.css">
   <link rel="stylesheet" href="css/annotator.css">
-
-  <!-- DataTables CSS -->
-  <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
-  <link rel="stylesheet" href="https://cdn.datatables.net/select/1.7.0/css/select.dataTables.min.css">
 
   <!-- Plotly -->
   <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
@@ -20,19 +20,18 @@
 <body>
   <!-- Header -->
   <header class="page-header">
-    <div class="container">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <img src="../shared/images/fred-logo-inverted.png" alt="FReD Logo" style="height: 50px; border-radius: 8px;">
-          <div>
-            <h1 style="margin: 0;">FLoRA Annotator</h1>
-            <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Annotate Reading Lists with Replication Information</p>
+    <div class="container topbar">
+        <div class="topbar-brand">
+          <span class="topbar-icon"><img src="../shared/images/forrt.svg" alt="FORRT logo" width="20" height="20"></span>
+          <div class="topbar-name">
+            <h1>FLoRA Annotator</h1>
+            <span>Annotate Reading Lists with Replication Information</span>
           </div>
         </div>
         <nav class="header-nav">
           <a href="#" class="header-nav-link" id="about-link">About</a>
           <a href="../explorer/index.html" class="header-nav-link">Explorer</a>
-          <button class="theme-toggle" title="Toggle dark/light mode">
+          <button class="theme-toggle" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">
             <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
@@ -49,7 +48,6 @@
             </svg>
           </button>
         </nav>
-      </div>
     </div>
   </header>
 
@@ -84,9 +82,9 @@ Smith, J. (2020). Study title. Journal Name. https://doi.org/10.1234/example
             ></textarea>
 
             <!-- DOI Lookup Section -->
-            <div class="doi-lookup-section" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--fred-bg-alt); border-radius: 6px;">
+            <div class="doi-lookup-section" style="margin-top: 0.75rem; padding: 0.75rem;">
               <div style="display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap;">
-                <span style="font-size: 0.875rem; color: var(--fred-text-muted);">Don't have DOIs?</span>
+                <span style="font-size: 0.875rem; color: var(--text-muted);">Don't have DOIs?</span>
                 <button class="btn btn-sm btn-secondary" id="btn-lookup-dois" title="Look up DOIs for references without them">
                   Look up DOIs via CrossRef
                 </button>
@@ -102,11 +100,11 @@ Smith, J. (2020). Study title. Journal Name. https://doi.org/10.1234/example
             </div>
 
             <!-- Retraction Check Option -->
-            <div class="retraction-check-section" style="margin-top: 0.75rem; padding: 0.75rem; background: var(--fred-bg-alt); border-radius: 6px; border: 1px solid var(--fred-border);">
+            <div class="retraction-check-section" style="margin-top: 0.75rem; padding: 0.75rem;">
               <label style="display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer;">
                 <input type="checkbox" id="check-retractions" style="margin-top: 0.2rem;">
                 <div>
-                  <span style="font-size: 0.875rem; font-weight: 500; color: var(--fred-text);">Check for retracted articles</span>
+                  <span style="font-size: var(--fs-5); font-weight: 600; color: var(--text);">Check for retracted articles</span>
                   <small class="text-muted" style="display: block; margin-top: 0.25rem;">
                     Query the Retraction Watch database to identify retracted papers. This requires downloading the database (~13MB) on first use.
                   </small>
@@ -226,7 +224,7 @@ Smith, J. (2020). Study title. Journal Name. https://doi.org/10.1234/example
         </div>
         <div class="card-body">
           <div id="report-container" class="report-view"></div>
-          <pre id="markdown-source" style="display: none; max-height: 400px; overflow-y: auto; background: #f5f5f5; padding: 1rem;"></pre>
+          <pre id="markdown-source" style="display: none; max-height: 400px; overflow-y: auto; padding: 1rem;"></pre>
         </div>
       </div>
 
@@ -234,10 +232,10 @@ Smith, J. (2020). Study title. Journal Name. https://doi.org/10.1234/example
   </main>
 
   <!-- Footer -->
-  <footer style="background: var(--fred-bg-alt); padding: 1rem 0; margin-top: 2rem; text-align: center; color: var(--fred-text-muted);">
+  <footer class="footer-bar">
     <div class="container">
       <p>FLoRA Annotator | <a href="https://forrt.org" target="_blank">FORRT</a> | Data last updated: <span id="data-updated">Loading...</span></p>
-      <p style="font-size: 0.85rem; margin-top: 0.5rem;">
+      <p>
         <a href="mailto:lukas.roeseler@uni-muenster.de?subject=FLoRA%20Annotator%20Feedback%20%2F%20Issue%20Report&body=Please%20describe%20your%20feedback%20or%20issue%20below%3A%0A%0A---%0A%0AIf%20reporting%20a%20data%20issue%2C%20please%20include%3A%0A-%20The%20DOI(s)%20or%20references%20affected%0A-%20What%20appears%20to%20be%20incorrect%0A-%20The%20correct%20information%20(if%20known)%0A-%20Source%2Freference%20for%20the%20correction">Share feedback / Report an issue</a>
       </p>
     </div>

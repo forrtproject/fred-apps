@@ -231,7 +231,7 @@ FReD.explorer = {
         );
 
         if (nonAssessableCount > 0) {
-          noteHtml += `<br><em style="color: var(--fred-text-muted);">For the selected entries, ${nonAssessableCount} of ${successCount} successes cannot be distinguished from reversals (non-directional effect type or missing effect size data).</em>`;
+          noteHtml += `<br><em style="color: var(--text-muted);">For the selected entries, ${nonAssessableCount} of ${successCount} successes cannot be distinguished from reversals (non-directional effect type or missing effect size data).</em>`;
         }
       }
 
@@ -645,7 +645,7 @@ FReD.explorer = {
     const hasReplication = es_r != null && ci_lower_r != null && ci_upper_r != null;
 
     if (!hasOriginal && !hasReplication) {
-      return '<p style="font-size: 0.875rem; color: var(--fred-text-muted);">Insufficient data for visualization</p>';
+      return '<p style="font-size: 0.875rem; color: var(--text-muted);">Insufficient data for visualization</p>';
     }
 
     // Calculate range for scaling (include 0 always)
@@ -675,19 +675,19 @@ FReD.explorer = {
     let svg = `<svg width="${width}" height="${height}" style="display: block; margin-top: 0.5rem;">`;
 
     // Zero line
-    svg += `<line x1="${zeroX}" y1="10" x2="${zeroX}" y2="70" stroke="#999" stroke-width="1" stroke-dasharray="3,3"/>`;
-    svg += `<text x="${zeroX}" y="78" text-anchor="middle" font-size="10" fill="#666">0</text>`;
+    svg += `<line x1="${zeroX}" y1="10" x2="${zeroX}" y2="70" style="stroke: var(--text-faint)" stroke-width="1" stroke-dasharray="3,3"/>`;
+    svg += `<text x="${zeroX}" y="78" text-anchor="middle" font-size="10" style="fill: var(--text-muted)">0</text>`;
 
     // Original CI (top row, y=25)
     if (hasOriginal) {
       const x1 = scale(ci_lower_o);
       const x2 = scale(ci_upper_o);
       const xPoint = scale(es_o);
-      svg += `<line x1="${x1}" y1="25" x2="${x2}" y2="25" stroke="#666" stroke-width="2"/>`;
-      svg += `<line x1="${x1}" y1="20" x2="${x1}" y2="30" stroke="#666" stroke-width="2"/>`;
-      svg += `<line x1="${x2}" y1="20" x2="${x2}" y2="30" stroke="#666" stroke-width="2"/>`;
-      svg += `<circle cx="${xPoint}" cy="25" r="5" fill="#666"/>`;
-      svg += `<text x="5" y="28" font-size="10" fill="#666">O</text>`;
+      svg += `<line x1="${x1}" y1="25" x2="${x2}" y2="25" style="stroke: var(--study-original)" stroke-width="2"/>`;
+      svg += `<line x1="${x1}" y1="20" x2="${x1}" y2="30" style="stroke: var(--study-original)" stroke-width="2"/>`;
+      svg += `<line x1="${x2}" y1="20" x2="${x2}" y2="30" style="stroke: var(--study-original)" stroke-width="2"/>`;
+      svg += `<circle cx="${xPoint}" cy="25" r="5" style="fill: var(--study-original)"/>`;
+      svg += `<text x="5" y="28" font-size="10" style="fill: var(--study-original)">O</text>`;
     }
 
     // Replication CI (bottom row, y=50)
@@ -695,11 +695,11 @@ FReD.explorer = {
       const x1 = scale(ci_lower_r);
       const x2 = scale(ci_upper_r);
       const xPoint = scale(es_r);
-      svg += `<line x1="${x1}" y1="50" x2="${x2}" y2="50" stroke="var(--fred-primary)" stroke-width="2"/>`;
-      svg += `<line x1="${x1}" y1="45" x2="${x1}" y2="55" stroke="var(--fred-primary)" stroke-width="2"/>`;
-      svg += `<line x1="${x2}" y1="45" x2="${x2}" y2="55" stroke="var(--fred-primary)" stroke-width="2"/>`;
-      svg += `<circle cx="${xPoint}" cy="50" r="5" fill="var(--fred-primary)"/>`;
-      svg += `<text x="5" y="53" font-size="10" fill="var(--fred-primary)">R</text>`;
+      svg += `<line x1="${x1}" y1="50" x2="${x2}" y2="50" style="stroke: var(--study-replication)" stroke-width="2"/>`;
+      svg += `<line x1="${x1}" y1="45" x2="${x1}" y2="55" style="stroke: var(--study-replication)" stroke-width="2"/>`;
+      svg += `<line x1="${x2}" y1="45" x2="${x2}" y2="55" style="stroke: var(--study-replication)" stroke-width="2"/>`;
+      svg += `<circle cx="${xPoint}" cy="50" r="5" style="fill: var(--study-replication)"/>`;
+      svg += `<text x="5" y="53" font-size="10" style="fill: var(--study-replication)">R</text>`;
     }
 
     svg += '</svg>';
@@ -738,18 +738,18 @@ FReD.explorer = {
     claimText = claimText.trim() ? FReD.utils.escapeHtml(claimText.trim()) : null;
     const claimsHtml = claimText ? `
           <div style="margin-bottom: 1rem;">
-            <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">Claim</h5>
+            <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Claim</h5>
             <div style="font-size: 0.875rem;">
               <p style="margin: 0;">${claimText}</p>
             </div>
           </div>` : '';
 
     return `
-      <div class="study-details" style="padding: 1rem; background: var(--fred-bg-alt); border-radius: 4px; margin: 0.5rem;">
+      <div class="study-details" style="padding: 1rem; background: var(--surface); border-radius: 4px; margin: 0.5rem;">
         ${claimsHtml}
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
           <div>
-            <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">Effect Sizes</h5>
+            <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Effect Sizes</h5>
             <table style="font-size: 0.875rem;">
               <tr><td style="padding-right: 1rem;"><strong>Original ES (r):</strong></td><td>${FReD.utils.formatNumber(study.es_o, 3) || 'N/A'}</td></tr>
               <tr><td><strong>Replication ES (r):</strong></td><td>${FReD.utils.formatNumber(study.es_r, 3) || 'N/A'}</td></tr>
@@ -758,7 +758,7 @@ FReD.explorer = {
             </table>
           </div>
           <div>
-            <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">Statistics</h5>
+            <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Statistics</h5>
             <table style="font-size: 0.875rem;">
               <tr><td style="padding-right: 1rem;"><strong>Original p-value:</strong></td><td>${this.formatCodedPValue(study.pval_value_o, study.pval_type_o)}</td></tr>
               <tr><td><strong>Replication p-value:</strong></td><td>${this.formatCodedPValue(study.pval_value_r, study.pval_type_r)}</td></tr>
@@ -767,7 +767,7 @@ FReD.explorer = {
             </table>
           </div>
           <div>
-            <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">Confidence Intervals</h5>
+            <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Confidence Intervals</h5>
             <table style="font-size: 0.875rem;">
               <tr><td style="padding-right: 1rem;"><strong>Original CI:</strong></td><td>[${FReD.utils.formatNumber(study.ci_lower_o, 3) || '?'}, ${FReD.utils.formatNumber(study.ci_upper_o, 3) || '?'}]</td></tr>
               <tr><td><strong>Replication CI:</strong></td><td>[${FReD.utils.formatNumber(study.ci_lower_r, 3) || '?'}, ${FReD.utils.formatNumber(study.ci_upper_r, 3) || '?'}]</td></tr>
@@ -776,7 +776,7 @@ FReD.explorer = {
           </div>
         </div>
         <div style="margin-top: 1rem;">
-          <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">References</h5>
+          <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">References</h5>
           <p style="font-size: 0.875rem; margin: 0 0 0.5rem 0;"><strong>Original:</strong> ${FReD.utils.escapeHtml(study.ref_o || 'N/A')}${origDOI}</p>
           <p style="font-size: 0.875rem; margin: 0;"><strong>Replication:</strong> ${repRef}${repDOI}${repLink}</p>
         </div>

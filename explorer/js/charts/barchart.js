@@ -88,7 +88,7 @@ FReD.charts.barchart = {
 
     // Get theme-aware layout
     const themeLayout = FReD.themeToggle ? FReD.themeToggle.getPlotlyLayout() : {};
-    const textColor = themeLayout.font?.color || '#333';
+    const textColor = themeLayout.font?.color;
 
     // Create traces for stacked bar
     const traces = outcomes.map(outcome => {
@@ -98,6 +98,7 @@ FReD.charts.barchart = {
 
       // Only show text label if segment is wide enough (>5% of total)
       const showLabel = proportion >= 0.05;
+      const segmentColor = colors[outcome] || colors[outcome.toLowerCase()] || colors['Not calculable'];
       // Shorten label for narrow segments (5-15%)
       const labelText = proportion >= 0.15
         ? `${outcome}: ${percentage}%`
@@ -113,14 +114,14 @@ FReD.charts.barchart = {
         textposition: 'inside',
         insidetextanchor: 'middle',
         textfont: {
-          color: '#fff',
+          color: FReD.themeToggle.textOn(segmentColor),
           size: 13
         },
         // Only show hover for segments without visible labels
         hoverinfo: showLabel ? 'none' : 'text',
         hovertext: [`${percentage}%`],
         marker: {
-          color: colors[outcome] || colors[outcome.toLowerCase()] || '#C8C8C8'
+          color: segmentColor
         }
       };
     });
@@ -157,10 +158,7 @@ FReD.charts.barchart = {
       },
       margin: { t: 5, r: 10, b: 35, l: 10 },
       height: 80,
-      hoverlabel: {
-        bgcolor: '#333',
-        font: { color: '#fff', size: 12 }
-      }
+      hoverlabel: themeLayout.hoverlabel
     };
 
     const config = {

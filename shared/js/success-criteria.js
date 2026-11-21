@@ -70,50 +70,102 @@ FReD.successCriteria = {
     }
   },
 
-  // Color mapping for outcomes
-  colors: {
+  // Outcome -> design token (CSS custom property in shared/css/theme.css).
+  // Resolved to real colours at render time via the `colors` getter below,
+  // so charts follow the active light/dark theme.
+  colorTokens: {
     // Common outcomes
-    'success': '#8FBC8F',
-    'Success': '#8FBC8F',
-    'failure': '#FF7F7F',
-    'Failure': '#FF7F7F',
-    'failure (reversal)': 'darkred',
-    'Failure (reversal)': 'darkred',
-    'OS not significant': '#D3D3D3',
-    'Not calculable': '#C8C8C8',
-    'not calculable': '#C8C8C8',
+    'success': '--outcome-success',
+    'Success': '--outcome-success',
+    'failure': '--outcome-failure',
+    'Failure': '--outcome-failure',
+    'failure (reversal)': '--outcome-reversal',
+    'Failure (reversal)': '--outcome-reversal',
+    'OS not significant': '--outcome-os-ns',
+    'Not calculable': '--outcome-na',
+    'not calculable': '--outcome-na',
 
     // Reported success outcomes (from FReD/FLoRA)
-    'successful': '#8FBC8F',
-    'Successful': '#8FBC8F',
-    'failed': '#FF7F7F',
-    'Failed': '#FF7F7F',
-    'mixed': '#FFD700',
-    'Mixed': '#FFD700',
-    'informative failure': '#FF7F7F',
-    'Informative failure': '#FF7F7F',
-    'uninformative': '#D3D3D3',
-    'Uninformative': '#D3D3D3',
-    'descriptive only': '#B0C4DE',
-    'Descriptive only': '#B0C4DE',
-    'statistically successful but flawed': '#d88201',
-    'Statistically successful but flawed': '#d88201',
+    'successful': '--outcome-success',
+    'Successful': '--outcome-success',
+    'failed': '--outcome-failure',
+    'Failed': '--outcome-failure',
+    'mixed': '--outcome-mixed',
+    'Mixed': '--outcome-mixed',
+    'informative failure': '--outcome-failure',
+    'Informative failure': '--outcome-failure',
+    'uninformative': '--outcome-os-ns',
+    'Uninformative': '--outcome-os-ns',
+    'descriptive only': '--outcome-descriptive',
+    'Descriptive only': '--outcome-descriptive',
+    'statistically successful but flawed': '--outcome-flawed',
+    'Statistically successful but flawed': '--outcome-flawed',
 
     // Homogeneity & significance specific
-    'success (homogeneous and jointly significantly above 0)': '#8FBC8F',
-    'Success (homogeneous and jointly significantly above 0)': '#8FBC8F',
-    'failure (not homogeneous but jointly significantly above 0)': '#efa986',
-    'Failure (not homogeneous but jointly significantly above 0)': '#efa986',
-    'failure (not homogeneous and not significant)': 'darkred',
-    'Failure (not homogeneous and not significant)': 'darkred',
-    'failure (homogeneous but not significant)': '#FF7F7F',
-    'Failure (homogeneous but not significant)': '#FF7F7F'
+    'success (homogeneous and jointly significantly above 0)': '--outcome-success',
+    'Success (homogeneous and jointly significantly above 0)': '--outcome-success',
+    'failure (not homogeneous but jointly significantly above 0)': '--outcome-failure-partial',
+    'Failure (not homogeneous but jointly significantly above 0)': '--outcome-failure-partial',
+    'failure (not homogeneous and not significant)': '--outcome-reversal',
+    'Failure (not homogeneous and not significant)': '--outcome-reversal',
+    'failure (homogeneous but not significant)': '--outcome-failure',
+    'Failure (homogeneous but not significant)': '--outcome-failure'
   },
 
   // Rug plot colors (significance indicators)
-  rugColors: {
-    significant: '#4DCCD0',
-    notSignificant: '#FA948C'
+  rugColorTokens: {
+    significant: '--sig-yes',
+    notSignificant: '--sig-no'
+  },
+
+  // Light-theme fallbacks, used only if the stylesheet has not loaded.
+  tokenFallbacks: {
+    '--outcome-success': '#16a34a',
+    '--outcome-failure': '#b42318',
+    '--outcome-reversal': '#7a1610',
+    '--outcome-os-ns': '#9a9c9c',
+    '--outcome-na': '#d0d1d1',
+    '--outcome-mixed': '#b8860b',
+    '--outcome-descriptive': '#8a9bb0',
+    '--outcome-flawed': '#c2410c',
+    '--outcome-failure-partial': '#e8857a',
+    '--sig-yes': '#853953',
+    '--sig-no': '#696969'
+  },
+
+  _resolved: null,
+  _resolvedTheme: null,
+
+  _resolve(map) {
+    const out = {};
+    const style = getComputedStyle(document.documentElement);
+    Object.keys(map).forEach(key => {
+      const token = map[key];
+      out[key] = style.getPropertyValue(token).trim() || this.tokenFallbacks[token];
+    });
+    return out;
+  },
+
+  _refresh() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
+    if (!this._resolved || this._resolvedTheme !== theme) {
+      this._resolved = {
+        colors: this._resolve(this.colorTokens),
+        rug: this._resolve(this.rugColorTokens)
+      };
+      this._resolvedTheme = theme;
+    }
+    return this._resolved;
+  },
+
+  /** Outcome label -> colour for the active theme */
+  get colors() {
+    return this._refresh().colors;
+  },
+
+  /** Significance rug colours for the active theme */
+  get rugColors() {
+    return this._refresh().rug;
   },
 
   /**

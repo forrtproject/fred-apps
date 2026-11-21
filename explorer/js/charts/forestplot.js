@@ -476,6 +476,10 @@ FReD.charts.forestplot = {
     const hoverRefsOriginal = validStudies.map(s => this.formatRefForHover(s.ref_o));
     const hoverRefsReplication = validStudies.map(s => this.formatRefForHover(s.ref_r));
 
+    // Study-type colours from theme tokens (Atlas: original = plum, replication = grey)
+    const studyOriginal = FReD.themeToggle.token('--study-original', '#853953');
+    const studyReplication = FReD.themeToggle.token('--study-replication', '#7a7a7a');
+
     // Original effect sizes
     const originalTrace = {
       x: validStudies.map(s => s.es_o),
@@ -490,13 +494,13 @@ FReD.charts.forestplot = {
         arrayminus: validStudies.map(s =>
           s.ci_lower_o != null ? s.es_o - s.ci_lower_o : 0
         ),
-        color: '#2563eb'  // Blue for original
+        color: studyOriginal
       },
       type: 'scatter',
       mode: 'markers',
       name: 'Original',
       marker: {
-        color: '#2563eb',  // Blue - visually dominant
+        color: studyOriginal,  // Plum - visually dominant (Atlas 'original' tag)
         size: 8
       },
       hovertemplate: '<b>%{customdata}</b><br><br>Original r = %{x:.3f}<extra></extra>'
@@ -516,13 +520,13 @@ FReD.charts.forestplot = {
         arrayminus: validStudies.map(s =>
           s.ci_lower_r != null ? s.es_r - s.ci_lower_r : 0
         ),
-        color: 'rgba(100,100,100,0.6)'  // Gray for replication
+        color: studyReplication
       },
       type: 'scatter',
       mode: 'markers',
       name: 'Replication',
       marker: {
-        color: 'rgba(100,100,100,0.7)',  // Gray - less dominant
+        color: studyReplication,  // Grey - less dominant
         size: 8
       },
       hovertemplate: '<b>%{customdata}</b><br><br>Replication r = %{x:.3f}<extra></extra>'
@@ -534,7 +538,7 @@ FReD.charts.forestplot = {
       y: [yPositions[0], yPositions[yPositions.length - 1]],
       type: 'scatter',
       mode: 'lines',
-      line: { color: 'rgba(128,128,128,0.8)', width: 2 },
+      line: { color: FReD.themeToggle.token('--text-faint', '#696969'), width: 1.5, dash: 'dot' },
       hoverinfo: 'skip',
       showlegend: false
     };
@@ -568,7 +572,7 @@ FReD.charts.forestplot = {
         range: [xMin - 0.1, xMax + 0.1],
         zeroline: true,
         zerolinewidth: 2,
-        zerolinecolor: themeLayout.xaxis?.zerolinecolor || 'rgba(128,128,128,0.5)',
+        zerolinecolor: themeLayout.xaxis?.zerolinecolor,
         gridcolor: themeLayout.xaxis?.gridcolor,
         linecolor: themeLayout.xaxis?.linecolor,
         showline: false,
