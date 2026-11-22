@@ -769,14 +769,25 @@ FReD.explorer = {
   },
 
   /**
-   * Handle column visibility toggle
+   * Handle column visibility toggle (preserves selector order and keeps >= 1 visible column)
    */
   handleColumnToggle(columnKey, isVisible) {
-    if (isVisible && !this.visibleColumns.includes(columnKey)) {
-      this.visibleColumns.push(columnKey);
-    } else if (!isVisible) {
-      this.visibleColumns = this.visibleColumns.filter(k => k !== columnKey);
+    const visibleSet = new Set(this.visibleColumns);
+    if (isVisible) {
+      visibleSet.add(columnKey);
+    } else {
+      if (visibleSet.size <= 1 && visibleSet.has(columnKey)) {
+        const cb = document.getElementById(`col-${columnKey}`);
+        if (cb) cb.checked = true;
+        FReD.utils.showNotification('At least one column must remain visible.', 'info', 2500);
+        return;
+      }
+      visibleSet.delete(columnKey);
     }
+
+    // Keep columns in the selector's canonical order immediately (no reload needed)
+    const order = FReD.columnConfig.getColumnOrder();
+    this.visibleColumns = order.filter(k => visibleSet.has(k));
 
     // Save preference
     FReD.columnConfig.saveVisibleColumns(this.visibleColumns);
