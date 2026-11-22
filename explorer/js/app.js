@@ -787,8 +787,8 @@ FReD.explorer = {
       visibleSet.delete(columnKey);
     }
 
-    // Keep columns in the selector's canonical order immediately (no reload needed)
-    const order = FReD.columnConfig.getColumnOrder();
+    // Keep columns in the selector's canonical order (includes newly added columns not yet in saved order)
+    const order = FReD.columnConfig.getSelectableColumns().map(c => c.key);
     this.visibleColumns = order.filter(k => visibleSet.has(k));
 
     // Save preference

@@ -8,15 +8,21 @@
 window.FReD = window.FReD || {};
 
 FReD.themeToggle = {
-  storageKey: 'fred-theme',
+  // Dedicated key for explicit user theme choice so legacy auto-written 'fred-theme'
+  // entries don't block returning visitors from following OS prefers-color-scheme.
+  storageKey: 'fred-theme-explicit',
 
   /**
-   * Initialize theme based on stored preference or system preference
+   * Initialize theme based on explicit stored preference or system preference
    */
   init() {
     const stored = localStorage.getItem(this.storageKey);
+    // Clean up legacy auto-saved key if present so it doesn't linger
+    if (localStorage.getItem('fred-theme') !== null) {
+      localStorage.removeItem('fred-theme');
+    }
 
-    if (stored) {
+    if (stored === 'dark' || stored === 'light') {
       this.setTheme(stored, false);
     } else {
       // Check system preference without locking localStorage

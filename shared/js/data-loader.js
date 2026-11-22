@@ -128,9 +128,9 @@ FReD.dataLoader = {
     const minPower = filters.minPower != null ? filters.minPower : 0.05;
     const keepMissing = filters.keepMissingPower !== false;
     filtered = filtered.filter(s => {
-      const hasPower = s.power_r != null && !isNaN(s.power_r);
+      const hasPower = s.power_r != null && s.power_r !== '' && Number.isFinite(Number(s.power_r));
       if (!hasPower) return keepMissing;
-      return s.power_r >= minPower;
+      return Number(s.power_r) >= minPower;
     });
 
     // Text search

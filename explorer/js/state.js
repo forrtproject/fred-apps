@@ -32,6 +32,8 @@ FReD.state = {
   init() {
     this.current = { ...this.defaults };
     this.loadFromURL();
+    // Normalize any invalid/out-of-range query params in place on first load
+    this.saveToURL(false);
 
     // Listen for browser back/forward
     window.addEventListener('popstate', () => {
@@ -42,7 +44,8 @@ FReD.state = {
       Object.keys(this.current).forEach((k) => {
         if (this.current[k] !== prev[k]) changes[k] = this.current[k];
       });
-      this.notifyListeners(Object.keys(changes).length ? changes : this.current);
+      if (Object.keys(changes).length === 0) return;
+      this.notifyListeners(changes);
     });
   },
 
@@ -110,10 +113,12 @@ FReD.state = {
 
     let hasChanges = false;
     let tabChanged = false;
+    const acceptedChanges = {};
     Object.entries(changes).forEach(([k, v]) => {
       if (k === 'tab' && !this.VALID_TABS.includes(v)) return;
       if (this.current[k] !== v) {
         this.current[k] = v;
+        acceptedChanges[k] = v;
         hasChanges = true;
         if (k === 'tab') tabChanged = true;
       }
@@ -121,7 +126,7 @@ FReD.state = {
 
     if (hasChanges) {
       this.saveToURL(tabChanged);
-      this.notifyListeners(changes);
+      this.notifyListeners(acceptedChanges);
     }
   },
 

@@ -286,7 +286,7 @@ FReD.charts.forestplot = {
       <div class="forest-controls">
         <div class="forest-controls-left">
           <span class="text-muted">
-            ${validStudies.length} ${validStudies.length === 1 ? 'effect' : 'effects'}${coverageSuffix}
+            ${validStudies.length.toLocaleString()} ${validStudies.length === 1 ? 'effect' : 'effects'}${coverageSuffix}
           </span>
           <div class="forest-control-group">
             <label for="forest-sort-simple" class="forest-control-label">Sort:</label>

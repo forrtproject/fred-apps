@@ -230,11 +230,11 @@ FReD.columnConfig = {
       );
     }
 
-    // Return visible columns in the stored order (never return an empty column list)
-    const columnOrder = this.getColumnOrder();
-    const resolved = columnOrder.filter(key => visibleSet.has(key));
+    // Return visible columns in full selectable order (includes newly added columns & never empty)
+    const allOrder = this.getSelectableColumns().map(c => c.key);
+    const resolved = allOrder.filter(key => visibleSet.has(key));
     if (resolved.length === 0) {
-      return columnOrder.filter(key => this.COLUMN_DEFINITIONS[key]?.defaultVisible);
+      return allOrder.filter(key => this.COLUMN_DEFINITIONS[key]?.defaultVisible);
     }
     return resolved;
   },

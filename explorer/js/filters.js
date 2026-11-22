@@ -128,9 +128,10 @@ FReD.filters = {
     let missingCount = 0;
     let belowCount = 0;
     for (const s of prePower) {
-      if (s.power_r == null || isNaN(s.power_r)) {
+      const hasPower = s.power_r != null && s.power_r !== '' && Number.isFinite(Number(s.power_r));
+      if (!hasPower) {
         missingCount++;
-      } else if (s.power_r < minPower) {
+      } else if (Number(s.power_r) < minPower) {
         belowCount++;
       }
     }
