@@ -16,7 +16,7 @@ FReD.successCriteria = {
       label: 'Significance of Replication',
       shortLabel: 'Significance (Rep)',
       hasOSNotSignificant: true,
-      note: 'Replication success was assessed based on the statistical significance of the replication effect (using reported p-values) and whether its direction is consistent with the original effect. Replications that were significant and in the same direction as the original were considered as successes, while replications that were not significant or in the opposite direction were considered as failures.',
+      note: 'Replication success was assessed based on the statistical significance of the replication effect (using reported p-values, falling back to effect-size-derived p-values when unavailable or indeterminate) and whether its direction is consistent with the original effect. Replications that were significant and in the same direction as the original were considered as successes, while replications that were not significant or in the opposite direction were considered as failures.',
       hasDynamicReversalNote: true
     },
     significance_agg: {
@@ -86,8 +86,12 @@ FReD.successCriteria = {
     // Reported success outcomes (from FReD/FLoRA)
     'successful': '#8FBC8F',
     'Successful': '#8FBC8F',
+    'successful replication': '#8FBC8F',
+    'Successful replication': '#8FBC8F',
     'failed': '#FF7F7F',
     'Failed': '#FF7F7F',
+    'failed replication': '#FF7F7F',
+    'Failed replication': '#FF7F7F',
     'mixed': '#FFD700',
     'Mixed': '#FFD700',
     'informative failure': '#FF7F7F',
@@ -99,13 +103,23 @@ FReD.successCriteria = {
     'statistically successful but flawed': '#d88201',
     'Statistically successful but flawed': '#d88201',
 
-    // Homogeneity & significance specific
+    // Homogeneity & significance specific (supports both legacy "above 0" and
+    // direction-neutral "different from 0" / opposite-direction labels from FReD;
+    // reserves "darkred" strictly for reversals / opposite-direction failures)
     'success (homogeneous and jointly significantly above 0)': '#8FBC8F',
     'Success (homogeneous and jointly significantly above 0)': '#8FBC8F',
+    'success (homogeneous and jointly significantly different from 0)': '#8FBC8F',
+    'Success (homogeneous and jointly significantly different from 0)': '#8FBC8F',
     'failure (not homogeneous but jointly significantly above 0)': '#efa986',
     'Failure (not homogeneous but jointly significantly above 0)': '#efa986',
-    'failure (not homogeneous and not significant)': 'darkred',
-    'Failure (not homogeneous and not significant)': 'darkred',
+    'failure (not homogeneous but jointly significantly different from 0)': '#efa986',
+    'Failure (not homogeneous but jointly significantly different from 0)': '#efa986',
+    'failure (homogeneous but jointly significant in opposite direction)': 'darkred',
+    'Failure (homogeneous but jointly significant in opposite direction)': 'darkred',
+    'failure (not homogeneous and jointly significant in opposite direction)': 'darkred',
+    'Failure (not homogeneous and jointly significant in opposite direction)': 'darkred',
+    'failure (not homogeneous and not significant)': '#CD5C5C',
+    'Failure (not homogeneous and not significant)': '#CD5C5C',
     'failure (homogeneous but not significant)': '#FF7F7F',
     'Failure (homogeneous but not significant)': '#FF7F7F'
   },
@@ -121,7 +135,7 @@ FReD.successCriteria = {
    */
   getColor(outcome) {
     if (!outcome) return this.colors['Not calculable'];
-    return this.colors[outcome] || this.colors['Not calculable'];
+    return this.colors[outcome] || this.colors[outcome.toLowerCase()] || this.colors['Not calculable'];
   },
 
   /**
@@ -153,8 +167,16 @@ FReD.successCriteria = {
       Object.assign(colors, {
         'success (homogeneous and jointly significantly above 0)': this.colors['success (homogeneous and jointly significantly above 0)'],
         'Success (homogeneous and jointly significantly above 0)': this.colors['Success (homogeneous and jointly significantly above 0)'],
+        'success (homogeneous and jointly significantly different from 0)': this.colors['success (homogeneous and jointly significantly different from 0)'],
+        'Success (homogeneous and jointly significantly different from 0)': this.colors['Success (homogeneous and jointly significantly different from 0)'],
         'failure (not homogeneous but jointly significantly above 0)': this.colors['failure (not homogeneous but jointly significantly above 0)'],
         'Failure (not homogeneous but jointly significantly above 0)': this.colors['Failure (not homogeneous but jointly significantly above 0)'],
+        'failure (not homogeneous but jointly significantly different from 0)': this.colors['failure (not homogeneous but jointly significantly different from 0)'],
+        'Failure (not homogeneous but jointly significantly different from 0)': this.colors['Failure (not homogeneous but jointly significantly different from 0)'],
+        'failure (homogeneous but jointly significant in opposite direction)': this.colors['failure (homogeneous but jointly significant in opposite direction)'],
+        'Failure (homogeneous but jointly significant in opposite direction)': this.colors['Failure (homogeneous but jointly significant in opposite direction)'],
+        'failure (not homogeneous and jointly significant in opposite direction)': this.colors['failure (not homogeneous and jointly significant in opposite direction)'],
+        'Failure (not homogeneous and jointly significant in opposite direction)': this.colors['Failure (not homogeneous and jointly significant in opposite direction)'],
         'failure (not homogeneous and not significant)': this.colors['failure (not homogeneous and not significant)'],
         'Failure (not homogeneous and not significant)': this.colors['Failure (not homogeneous and not significant)'],
         'failure (homogeneous but not significant)': this.colors['failure (homogeneous but not significant)'],
@@ -167,8 +189,13 @@ FReD.successCriteria = {
       Object.assign(colors, {
         'successful': this.colors['successful'],
         'Successful': this.colors['Successful'],
+        'successful replication': this.colors['successful replication'],
+        'Successful replication': this.colors['Successful replication'],
         'failed': this.colors['failed'],
         'Failed': this.colors['Failed'],
+        'failed replication': this.colors['failed replication'],
+        'Failed replication': this.colors['Failed replication'],
+        'OS not significant': this.colors['OS not significant'],
         'mixed': this.colors['mixed'],
         'Mixed': this.colors['Mixed'],
         'informative failure': this.colors['informative failure'],
@@ -208,42 +235,108 @@ FReD.successCriteria = {
       return { outcome: 'Not calculable', outcomeReport: 'Not calculable', color: this.colors['Not calculable'] };
     }
 
+    const rawOutcome = outcomeData.outcome;
+    let rawReport = outcomeData.outcome_report;
+    // Normalize legacy FReD "not coded" placeholder when a computed criterion cannot be evaluated
+    if (!rawOutcome && rawReport && rawReport.toLowerCase() === 'not coded') {
+      rawReport = null;
+    }
+
+    const outcome = rawOutcome || 'Not calculable';
+    const outcomeReport = rawReport || outcome;
+
     return {
-      outcome: outcomeData.outcome || 'Not calculable',
-      outcomeReport: outcomeData.outcome_report || outcomeData.outcome || 'Not calculable',
-      color: this.getColor(outcomeData.outcome_report || outcomeData.outcome)
+      outcome,
+      outcomeReport,
+      color: this.getColor(outcomeReport)
     };
   },
 
   /**
-   * Calculate p-value from r and N (for reference)
+   * Calculate two-tailed p-value from correlation r and sample size N (mirrors FReD::p_from_r)
    */
   pFromR(r, n) {
-    if (r === null || n === null || isNaN(r) || isNaN(n) || n <= 2) return null;
-    const t = r * Math.sqrt((n - 2) / (1 - r * r));
-    // Two-tailed p-value using approximation
-    const df = n - 2;
+    if (r === null || r === undefined || n === null || n === undefined || r === '' || n === '') return null;
+    const rNum = Number(r);
+    const nNum = Number(n);
+    if (!Number.isFinite(rNum) || !Number.isFinite(nNum) || nNum <= 2 || Math.abs(rNum) > 1) return null;
+    if (Math.abs(rNum) === 1) return 0;
+    const df = nNum - 2;
+    const t = rNum * Math.sqrt(df / (1 - rNum * rNum));
     const x = df / (df + t * t);
-    // Incomplete beta approximation (simplified)
-    const p = this._betaInc(df / 2, 0.5, x);
-    return p;
+    return this._betaInc(df / 2, 0.5, x);
   },
 
   /**
-   * Incomplete beta function approximation
+   * Regularized incomplete beta function I_x(a, b) via Lentz's continued fraction
    */
   _betaInc(a, b, x) {
-    // Simplified approximation for p-value calculation
-    // For production use, consider a more robust implementation
-    if (x === 0) return 0;
-    if (x === 1) return 1;
-    // Use normal approximation for large df
-    if (a > 100) {
-      const z = Math.sqrt(2 * a) * (Math.pow(x / (1 - x), 1/3) * (1 - 1/(9*a)) - (1 - 1/(9*b)));
-      return 1 - this._normalCDF(Math.abs(z)) * 2;
+    if (x <= 0) return 0;
+    if (x >= 1) return 1;
+    const bt = Math.exp(
+      this._logGamma(a + b) - this._logGamma(a) - this._logGamma(b) +
+      a * Math.log(x) + b * Math.log(1 - x)
+    );
+    if (x < (a + 1) / (a + b + 2)) {
+      return bt * this._betaCF(a, b, x) / a;
     }
-    // Fallback
-    return 0.05; // Default fallback
+    return 1 - bt * this._betaCF(b, a, 1 - x) / b;
+  },
+
+  /**
+   * Continued fraction evaluation for regularized incomplete beta (Numerical Recipes / Lentz)
+   */
+  _betaCF(a, b, x) {
+    const MAXIT = 200;
+    const EPS = 3e-12;
+    const FPMIN = 1e-300;
+    const qab = a + b;
+    const qap = a + 1;
+    const qam = a - 1;
+    let c = 1;
+    let d = 1 - qab * x / qap;
+    if (Math.abs(d) < FPMIN) d = FPMIN;
+    d = 1 / d;
+    let h = d;
+    for (let m = 1; m <= MAXIT; m++) {
+      const m2 = 2 * m;
+      let aa = m * (b - m) * x / ((qam + m2) * (a + m2));
+      d = 1 + aa * d;
+      if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c;
+      if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      h *= d * c;
+      aa = -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2));
+      d = 1 + aa * d;
+      if (Math.abs(d) < FPMIN) d = FPMIN;
+      c = 1 + aa / c;
+      if (Math.abs(c) < FPMIN) c = FPMIN;
+      d = 1 / d;
+      const del = d * c;
+      h *= del;
+      if (Math.abs(del - 1) < EPS) break;
+    }
+    return h;
+  },
+
+  /**
+   * Lanczos approximation for ln(Gamma(z))
+   */
+  _logGamma(z) {
+    const cof = [
+      76.18009172947146, -86.50532032941677, 24.01409824083091,
+      -1.231739572450155, 0.1208650973866179e-2, -0.5395239384953e-5
+    ];
+    let x = z;
+    let y = z;
+    let tmp = x + 5.5;
+    tmp -= (x + 0.5) * Math.log(tmp);
+    let ser = 1.000000000190015;
+    for (let j = 0; j < cof.length; j++) {
+      ser += cof[j] / ++y;
+    }
+    return -tmp + Math.log(2.5066282746310005 * ser / x);
   },
 
   /**

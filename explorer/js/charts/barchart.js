@@ -71,11 +71,15 @@ FReD.charts.barchart = {
     const outcomeOrder = [
       'Success', 'success',
       'Success (homogeneous and jointly significantly above 0)',
+      'Success (homogeneous and jointly significantly different from 0)',
       'Failure (not homogeneous but jointly significantly above 0)',
+      'Failure (not homogeneous but jointly significantly different from 0)',
       'Failure', 'failure',
-      'Failure (reversal)', 'failure (reversal)',
-      'Failure (not homogeneous and not significant)',
       'Failure (homogeneous but not significant)',
+      'Failure (not homogeneous and not significant)',
+      'Failure (reversal)', 'failure (reversal)',
+      'Failure (homogeneous but jointly significant in opposite direction)',
+      'Failure (not homogeneous and jointly significant in opposite direction)',
       'OS not significant',
       'Not calculable', 'not coded'
     ];

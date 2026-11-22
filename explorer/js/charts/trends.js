@@ -42,9 +42,9 @@ FReD.charts.trends = {
     // Aggregate by reference to avoid counting same original multiple times
     const aggregated = FReD.dataLoader.aggregateByReference(studies, criterion);
 
-    // Extract years and decades
+    // Extract years and decades (prefer pre-extracted orig_year over regex fallback)
     const withDecade = aggregated.map(item => {
-      const year = FReD.utils.extractYear(item.ref_o);
+      const year = item.orig_year || FReD.utils.extractYear(item.ref_o);
       const decade = year ? FReD.utils.getDecade(year) : null;
       return { ...item, year, decade };
     }).filter(item => item.decade && item.decade >= 1950 && item.decade <= 2020);
@@ -57,15 +57,34 @@ FReD.charts.trends = {
     // Group by decade and outcome
     const decadeOutcomes = {};
     withDecade.forEach(item => {
-      const key = `${item.decade}-${item.outcome}`;
       if (!decadeOutcomes[item.decade]) {
         decadeOutcomes[item.decade] = {};
       }
       decadeOutcomes[item.decade][item.outcome] = (decadeOutcomes[item.decade][item.outcome] || 0) + 1;
     });
 
-    // Get unique outcomes and decades
-    const outcomes = [...new Set(withDecade.map(d => d.outcome))];
+    // Get unique outcomes (sorted consistently) and decades
+    const outcomeOrder = [
+      'success', 'successful', 'successful replication',
+      'success (homogeneous and jointly significantly above 0)',
+      'success (homogeneous and jointly significantly different from 0)',
+      'statistically successful but flawed',
+      'failure', 'failed', 'failed replication', 'informative failure',
+      'failure (not homogeneous but jointly significantly above 0)',
+      'failure (not homogeneous but jointly significantly different from 0)',
+      'failure (homogeneous but not significant)',
+      'failure (not homogeneous and not significant)',
+      'failure (reversal)',
+      'failure (homogeneous but jointly significant in opposite direction)',
+      'failure (not homogeneous and jointly significant in opposite direction)',
+      'mixed',
+      'OS not significant', 'uninformative', 'descriptive only', 'not calculable'
+    ];
+    const outcomes = [...new Set(withDecade.map(d => d.outcome))].sort((a, b) => {
+      const aIdx = outcomeOrder.findIndex(o => o.toLowerCase() === a.toLowerCase());
+      const bIdx = outcomeOrder.findIndex(o => o.toLowerCase() === b.toLowerCase());
+      return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+    });
     const decades = Object.keys(decadeOutcomes).sort();
 
     // Get colors - include mixed color explicitly
@@ -215,13 +234,19 @@ FReD.charts.trends = {
     // left of mixed instead of falling back to alphabetical order.
     const outcomeOrder = [
       // successes
-      'success', 'successful', 'success (homogeneous and jointly significantly above 0)',
+      'success', 'successful', 'successful replication',
+      'success (homogeneous and jointly significantly above 0)',
+      'success (homogeneous and jointly significantly different from 0)',
       'statistically successful but flawed',
       // failures
-      'failure', 'failed', 'informative failure', 'failure (reversal)',
+      'failure', 'failed', 'failed replication', 'informative failure',
       'failure (not homogeneous but jointly significantly above 0)',
+      'failure (not homogeneous but jointly significantly different from 0)',
       'failure (homogeneous but not significant)',
       'failure (not homogeneous and not significant)',
+      'failure (reversal)',
+      'failure (homogeneous but jointly significant in opposite direction)',
+      'failure (not homogeneous and jointly significant in opposite direction)',
       // mixed (aggregated references with differing replication outcomes)
       'mixed',
       // non-informative / not assessable
