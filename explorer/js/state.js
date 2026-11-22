@@ -13,7 +13,8 @@ FReD.state = {
   // Default state
   defaults: {
     source: 'All studies',
-    minPower: 0,
+    minPower: 0.05,
+    keepMissingPower: true,
     criterion: 'significance_r',
     search: '',
     tab: 'overview'
@@ -56,9 +57,12 @@ FReD.state = {
     }
     if (params.power !== undefined) {
       const power = parseFloat(params.power);
-      if (!isNaN(power) && power >= 0 && power <= 0.99) {
+      if (!isNaN(power) && power >= 0.05 && power <= 0.99) {
         this.current.minPower = Math.round(power * 100) / 100;
       }
+    }
+    if (params.keepMissingPower !== undefined) {
+      this.current.keepMissingPower = params.keepMissingPower !== 'false' && params.keepMissingPower !== '0';
     }
     if (params.criterion && FReD.successCriteria.criteria[params.criterion]) {
       this.current.criterion = params.criterion;
@@ -80,6 +84,7 @@ FReD.state = {
     const params = {
       source: this.current.source !== this.defaults.source ? this.current.source : null,
       power: this.current.minPower !== this.defaults.minPower ? this.current.minPower : null,
+      keepMissingPower: this.current.keepMissingPower !== this.defaults.keepMissingPower ? 'false' : null,
       criterion: this.current.criterion,  // Always show criterion for transparency
       search: this.current.search !== this.defaults.search ? this.current.search : null,
       tab: this.current.tab !== this.defaults.tab ? this.current.tab : null

@@ -272,12 +272,14 @@ FReD.explorer = {
     this.filteredStudies = FReD.filters.applyFilters(this.allStudies, {
       source: state.source,
       minPower: state.minPower,
+      keepMissingPower: state.keepMissingPower,
       search: state.search
     });
 
-    // Update count displays
+    // Update count displays & power breakdown note
     FReD.filters.updateStudyCount(this.filteredStudies.length, this.allStudies.length);
     FReD.filters.updateReplicationCount(this.filteredStudies, this.allStudies);
+    FReD.filters.updatePowerNote(this.allStudies, state);
 
     // Update success note (depends on filtered studies)
     this.updateSuccessNote(state.criterion);
