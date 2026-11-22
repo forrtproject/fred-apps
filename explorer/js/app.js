@@ -942,8 +942,9 @@ FReD.explorer = {
     const criterionInfo = FReD.successCriteria.getCriterion(criterion);
     const criterionLabel = criterionInfo ? criterionInfo.label : criterion;
 
+    const isFiniteNum = (v) => v != null && v !== '' && Number.isFinite(Number(v));
     const formatCI = (lo, hi) => {
-      if (lo == null || hi == null || isNaN(lo) || isNaN(hi)) return 'N/A';
+      if (!isFiniteNum(lo) || !isFiniteNum(hi)) return 'N/A';
       return `[${FReD.utils.formatNumber(lo, 3)}, ${FReD.utils.formatNumber(hi, 3)}]`;
     };
 
@@ -1050,7 +1051,7 @@ FReD.explorer = {
           { title: 'Power' },
           { title: 'Result' },
           { title: 'Discipline' },
-          { title: 'idx', visible: false }
+          { title: 'idx', visible: false, searchable: false }
         ],
         pageLength: 25,
         order: [[0, 'asc']],
@@ -1072,16 +1073,16 @@ FReD.explorer = {
       FReD.utils.copyToClipboard(text);
     });
 
-    // CSV button (visible columns & active table search)
+    // CSV button (visible columns & active table search; UTF-8 BOM for Excel)
     document.getElementById('btn-csv')?.addEventListener('click', () => {
-      const csv = this.getTableCSV();
-      FReD.utils.downloadFile(csv, `fred-explorer-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+      const csv = '\uFEFF' + this.getTableCSV();
+      FReD.utils.downloadFile(csv, `fred-explorer-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8');
     });
 
-    // Download CSV button (full dataset tab, respects active table search)
+    // Download CSV button (full dataset tab, respects active table search; UTF-8 BOM for Excel)
     document.getElementById('btn-download')?.addEventListener('click', () => {
-      const csv = this.getFullDatasetCSV();
-      FReD.utils.downloadFile(csv, `fred-explorer-full-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+      const csv = '\uFEFF' + this.getFullDatasetCSV();
+      FReD.utils.downloadFile(csv, `fred-explorer-full-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8');
     });
   },
 
@@ -1283,6 +1284,16 @@ FReD.explorer = {
   },
 
   /**
+   * Neutralize spreadsheet formula injection in non-numeric text cells.
+   */
+  _neutralizeSpreadsheetFormula(str) {
+    if (/^[=+\-@\t\r]/.test(str) && !/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(str.trim())) {
+      return "'" + str;
+    }
+    return str;
+  },
+
+  /**
    * Format a single cell for CSV with RFC 4180 quoting and spreadsheet formula neutralization.
    */
   _formatCsvCell(val) {
@@ -1290,11 +1301,7 @@ FReD.explorer = {
     if (typeof val === 'number') {
       return isFinite(val) ? String(val) : '';
     }
-    let str = String(val);
-    // Neutralize formula injection in non-numeric text cells
-    if (/^[=+\-@\t\r]/.test(str) && !/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(str.trim())) {
-      str = "'" + str;
-    }
+    const str = this._neutralizeSpreadsheetFormula(String(val));
     if (/[",\r\n]/.test(str)) {
       return '"' + str.replace(/"/g, '""') + '"';
     }
@@ -1311,9 +1318,14 @@ FReD.explorer = {
     const studies = this._getActiveTableStudies(this.dataTable);
 
     const rows = studies.map(study =>
-      cols.map(k => String(FReD.columnConfig.getPlainValue(study, k, criterion) ?? '').replace(/[\t\r\n]+/g, ' ')).join('\t')
+      cols.map(k => {
+        const raw = FReD.columnConfig.getPlainValue(study, k, criterion);
+        if (typeof raw === 'number') return isFinite(raw) ? String(raw) : '';
+        const clean = String(raw ?? '').replace(/[\t\r\n]+/g, ' ');
+        return this._neutralizeSpreadsheetFormula(clean);
+      }).join('\t')
     );
-    return [headers.join('\t'), ...rows].join('\n');
+    return [headers.join('\t'), ...rows].join('\r\n');
   },
 
   /**
@@ -1329,7 +1341,7 @@ FReD.explorer = {
     const rows = studies.map(study =>
       cols.map(k => this._formatCsvCell(FReD.columnConfig.getPlainValue(study, k, criterion))).join(',')
     );
-    return [headerLine, ...rows].join('\n');
+    return [headerLine, ...rows].join('\r\n');
   },
 
   /**
@@ -1347,11 +1359,11 @@ FReD.explorer = {
       { header: 'Original Year', get: s => s.orig_year ?? '' },
       { header: 'Original Journal', get: s => s.orig_journal || '' },
       { header: 'Result', get: s => FReD.utils.capFirstLetter(FReD.successCriteria.getOutcome(s, criterion).outcomeReport || 'Not calculable') },
-      { header: 'ES (Orig)', get: s => (s.es_o != null && !isNaN(s.es_o)) ? s.es_o : '' },
-      { header: 'ES (Rep)', get: s => (s.es_r != null && !isNaN(s.es_r)) ? s.es_r : '' },
+      { header: 'ES (Orig)', get: s => (s.es_o != null && s.es_o !== '' && Number.isFinite(Number(s.es_o))) ? Number(s.es_o) : '' },
+      { header: 'ES (Rep)', get: s => (s.es_r != null && s.es_r !== '' && Number.isFinite(Number(s.es_r))) ? Number(s.es_r) : '' },
       { header: 'N (Orig)', get: s => s.n_o ?? '' },
       { header: 'N (Rep)', get: s => s.n_r ?? '' },
-      { header: 'Power', get: s => (s.power_r != null && !isNaN(s.power_r)) ? s.power_r : '' },
+      { header: 'Power', get: s => (s.power_r != null && s.power_r !== '' && Number.isFinite(Number(s.power_r))) ? Number(s.power_r) : '' },
       { header: 'DOI (Orig)', get: s => s.doi_o || '' },
       { header: 'DOI (Rep)', get: s => s.doi_r || '' }
     ];
@@ -1360,7 +1372,7 @@ FReD.explorer = {
     const rows = studies.map(study =>
       columns.map(c => this._formatCsvCell(c.get(study))).join(',')
     );
-    return [headerLine, ...rows].join('\n');
+    return [headerLine, ...rows].join('\r\n');
   }
 };
 

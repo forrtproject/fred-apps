@@ -278,10 +278,11 @@ FReD.columnConfig = {
       }
     });
 
-    // Always add hidden idx column last
+    // Always add hidden idx column last (non-searchable so row indices don't pollute search)
     columns.push({
       title: 'idx',
-      visible: false
+      visible: false,
+      searchable: false
     });
 
     return columns;
@@ -327,11 +328,13 @@ FReD.columnConfig = {
       case 'n_r': return study.n_r ?? '';
       case 'power_r': return study.power_r != null && !isNaN(study.power_r) ? study.power_r : '';
       case 'ci_o':
-        return (study.ci_lower_o != null && study.ci_upper_o != null)
+        return (study.ci_lower_o != null && study.ci_lower_o !== '' && Number.isFinite(Number(study.ci_lower_o)) &&
+                study.ci_upper_o != null && study.ci_upper_o !== '' && Number.isFinite(Number(study.ci_upper_o)))
           ? `[${FReD.utils.formatNumber(study.ci_lower_o, 3)}, ${FReD.utils.formatNumber(study.ci_upper_o, 3)}]`
           : '';
       case 'ci_r':
-        return (study.ci_lower_r != null && study.ci_upper_r != null)
+        return (study.ci_lower_r != null && study.ci_lower_r !== '' && Number.isFinite(Number(study.ci_lower_r)) &&
+                study.ci_upper_r != null && study.ci_upper_r !== '' && Number.isFinite(Number(study.ci_upper_r)))
           ? `[${FReD.utils.formatNumber(study.ci_lower_r, 3)}, ${FReD.utils.formatNumber(study.ci_upper_r, 3)}]`
           : '';
       default:
