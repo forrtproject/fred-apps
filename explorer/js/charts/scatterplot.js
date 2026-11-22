@@ -86,19 +86,25 @@ FReD.charts.scatterplot = {
     // Create scatter traces
     const traces = [];
 
-    // Define order for legend
+    // Define order for legend (exact case-insensitive matching across all criteria)
     const outcomeOrder = [
-      'Success', 'success',
-      'Failure', 'failure',
-      'Failure (reversal)', 'failure (reversal)',
-      'OS not significant',
-      'Not calculable', 'not calculable'
+      'success', 'successful', 'successful replication',
+      'success (homogeneous and jointly significantly above 0)',
+      'statistically successful but flawed',
+      'failure (not homogeneous but jointly significantly above 0)',
+      'failure', 'failed', 'failed replication', 'informative failure',
+      'failure (reversal)',
+      'failure (homogeneous but not significant)',
+      'failure (not homogeneous and not significant)',
+      'mixed',
+      'OS not significant', 'uninformative', 'descriptive only',
+      'not calculable'
     ];
 
     // Sort outcomes for consistent legend order
     const sortedOutcomes = Object.keys(tracesByOutcome).sort((a, b) => {
-      const aIdx = outcomeOrder.findIndex(o => a.toLowerCase().includes(o.toLowerCase()));
-      const bIdx = outcomeOrder.findIndex(o => b.toLowerCase().includes(o.toLowerCase()));
+      const aIdx = outcomeOrder.findIndex(o => a.toLowerCase() === o.toLowerCase());
+      const bIdx = outcomeOrder.findIndex(o => b.toLowerCase() === o.toLowerCase());
       return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
     });
 
@@ -150,11 +156,16 @@ FReD.charts.scatterplot = {
     const sigReplication = validStudies.filter(s => s.p_r != null && s.p_r < 0.05);
     const nsReplication = validStudies.filter(s => s.p_r != null && s.p_r >= 0.05);
 
+    // Ensure y-axis covers strongly negative replication effects without clipping
+    const minEsR = Math.min(...validStudies.map(s => s.es_r));
+    const yMin = minEsR < -0.5 ? Math.max(-1.08, Math.floor(minEsR * 10) / 10 - 0.08) : -0.55;
+    const bottomRugY = yMin + 0.03;
+
     // Bottom rug (original significance) - using bar shapes for better visibility
     if (sigOriginal.length > 0) {
       traces.push({
         x: sigOriginal.map(s => s.es_o),
-        y: sigOriginal.map(() => -0.52),
+        y: sigOriginal.map(() => bottomRugY),
         type: 'scatter',
         mode: 'markers',
         marker: { symbol: 'line-ns', size: 12, color: '#4DCCD0', line: { width: 2, color: '#4DCCD0' } },
@@ -166,7 +177,7 @@ FReD.charts.scatterplot = {
     if (nsOriginal.length > 0) {
       traces.push({
         x: nsOriginal.map(s => s.es_o),
-        y: nsOriginal.map(() => -0.52),
+        y: nsOriginal.map(() => bottomRugY),
         type: 'scatter',
         mode: 'markers',
         marker: { symbol: 'line-ns', size: 12, color: '#FA948C', line: { width: 2, color: '#FA948C' } },
@@ -218,7 +229,7 @@ FReD.charts.scatterplot = {
       },
       yaxis: {
         title: 'Replication Effect Size (r)',
-        range: [-0.55, 1.05],
+        range: [yMin, 1.05],
         fixedrange: true,
         dtick: 0.25,
         gridcolor: themeLayout.yaxis?.gridcolor,

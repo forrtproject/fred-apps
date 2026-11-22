@@ -53,13 +53,25 @@ flora_processed <- flora_df %>%
     study_type = type
   )
 
-# Group by original DOI for the annotator's lookup format
+# Group by normalized original DOI for the annotator's lookup format
 cat("Grouping by original DOI...\n")
 
-entries <- flora_processed %>%
-  filter(!is.na(doi_original) & doi_original != "") %>%
-  group_by(doi_original) %>%
+flora_valid <- flora_processed %>%
+  mutate(
+    doi_original = trimws(as.character(doi_original)),
+    doi_key = tolower(doi_original)
+  ) %>%
+  filter(!is.na(doi_original) & doi_original != "")
+
+dropped_count <- nrow(flora_processed) - nrow(flora_valid)
+if (dropped_count > 0) {
+  cat("Dropped", dropped_count, "records without doi_original\n")
+}
+
+entries <- flora_valid %>%
+  group_by(doi_key) %>%
   summarise(
+    doi_original = first(doi_original),
     ref_original = first(ref_original),
     title_original = first(title_original),
     journal_original = first(journal_original),
@@ -76,12 +88,13 @@ entries <- flora_processed %>%
       study_type = study_type
     )),
     .groups = "drop"
-  )
+  ) %>%
+  select(-doi_key)
 
 cat("Created", nrow(entries), "unique original study entries\n")
 
 # Count outcomes for summary
-outcome_counts <- flora_processed %>%
+outcome_counts <- flora_valid %>%
   count(outcome) %>%
   arrange(desc(n))
 
@@ -94,7 +107,7 @@ output <- list(
     generated = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"),
     source = FLORA_URL,
     entryCount = nrow(entries),
-    replicationCount = nrow(flora_processed)
+    replicationCount = nrow(flora_valid)
   ),
   entries = entries,
   outcomeSymbols = list(
