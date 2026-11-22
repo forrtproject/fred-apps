@@ -70,13 +70,15 @@ FReD.columnConfig = {
       key: 'ref_o',
       label: 'Original Reference',
       defaultVisible: true,
-      getValue: (study) => FReD.utils.formatReferenceCell(study.ref_o, study.doi_o)
+      getValue: (study) => FReD.utils.formatReferenceCell(study.ref_o, study.doi_o),
+      className: 'ref-cell'
     },
     ref_r: {
       key: 'ref_r',
       label: 'Replication Reference',
       defaultVisible: true,
-      getValue: (study) => FReD.utils.formatReferenceCell(study.ref_r, study.doi_r, study.url_r)
+      getValue: (study) => FReD.utils.formatReferenceCell(study.ref_r, study.doi_r, study.url_r),
+      className: 'ref-cell'
     },
     source: {
       key: 'source',

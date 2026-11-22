@@ -17,17 +17,17 @@ FReD.themeToggle = {
     const stored = localStorage.getItem(this.storageKey);
 
     if (stored) {
-      this.setTheme(stored);
+      this.setTheme(stored, false);
     } else {
-      // Check system preference
+      // Check system preference without locking localStorage
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      this.setTheme(prefersDark ? 'dark' : 'light');
+      this.setTheme(prefersDark ? 'dark' : 'light', false);
     }
 
-    // Listen for system preference changes
+    // Listen for system preference changes until user picks an explicit theme
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
       if (!localStorage.getItem(this.storageKey)) {
-        this.setTheme(e.matches ? 'dark' : 'light');
+        this.setTheme(e.matches ? 'dark' : 'light', false);
       }
     });
 
@@ -36,11 +36,13 @@ FReD.themeToggle = {
   },
 
   /**
-   * Set the theme
+   * Set the theme (persists to localStorage only when user explicitly chooses)
    */
-  setTheme(theme) {
+  setTheme(theme, persist = true) {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem(this.storageKey, theme);
+    if (persist) {
+      localStorage.setItem(this.storageKey, theme);
+    }
 
     // Dispatch event for charts to re-render
     window.dispatchEvent(new CustomEvent('themechange', { detail: { theme } }));

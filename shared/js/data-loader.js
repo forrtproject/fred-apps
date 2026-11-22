@@ -124,9 +124,9 @@ FReD.dataLoader = {
       filtered = filtered.filter(s => s.source === filters.source);
     }
 
-    // Power filter
-    if (filters.minPower && filters.minPower > 0.05) {
-      filtered = filtered.filter(s => s.power_r >= filters.minPower);
+    // Power filter (0 = Any / unfiltered)
+    if (filters.minPower != null && filters.minPower > 0) {
+      filtered = filtered.filter(s => s.power_r != null && !isNaN(s.power_r) && s.power_r >= filters.minPower);
     }
 
     // Text search

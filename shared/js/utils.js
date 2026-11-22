@@ -191,7 +191,7 @@ FReD.utils = {
   /**
    * Update URL query parameters without reload
    */
-  updateQueryParams(params) {
+  updateQueryParams(params, push = false) {
     const url = new URL(window.location);
     Object.entries(params).forEach(([key, value]) => {
       if (value === null || value === undefined || value === '') {
@@ -200,7 +200,11 @@ FReD.utils = {
         url.searchParams.set(key, value);
       }
     });
-    window.history.replaceState({}, '', url);
+    if (push) {
+      window.history.pushState({}, '', url);
+    } else {
+      window.history.replaceState({}, '', url);
+    }
   },
 
   /**

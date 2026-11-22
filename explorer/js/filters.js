@@ -59,9 +59,9 @@ FReD.filters = {
     // Power slider
     this.elements.minPower.addEventListener('input', (e) => {
       const value = parseFloat(e.target.value);
-      const pctText = Math.round(value * 100) + '%';
-      this.elements.minPowerValue.textContent = pctText;
-      this.elements.minPower.setAttribute('aria-valuetext', pctText);
+      const label = this.formatPowerLabel(value);
+      this.elements.minPowerValue.textContent = label;
+      this.elements.minPower.setAttribute('aria-valuetext', label);
     });
 
     this.elements.minPower.addEventListener('change', (e) => {
@@ -85,6 +85,10 @@ FReD.filters = {
     });
   },
 
+  formatPowerLabel(value) {
+    return !value || value <= 0 ? 'Any (unfiltered)' : Math.round(value * 100) + '%';
+  },
+
   /**
    * Apply state to UI elements
    */
@@ -100,12 +104,13 @@ FReD.filters = {
     }
 
     // Power slider
-    if (parseFloat(this.elements.minPower.value) !== state.minPower) {
-      this.elements.minPower.value = state.minPower;
-      const pctText = Math.round(state.minPower * 100) + '%';
-      this.elements.minPowerValue.textContent = pctText;
-      this.elements.minPower.setAttribute('aria-valuetext', pctText);
+    const minPower = state.minPower ?? 0;
+    if (parseFloat(this.elements.minPower.value) !== minPower) {
+      this.elements.minPower.value = minPower;
     }
+    const powerLabel = this.formatPowerLabel(minPower);
+    this.elements.minPowerValue.textContent = powerLabel;
+    this.elements.minPower.setAttribute('aria-valuetext', powerLabel);
 
     // Criterion dropdown
     if (this.elements.criterionSelect && this.elements.criterionSelect.value !== state.criterion) {

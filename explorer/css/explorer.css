@@ -315,8 +315,8 @@ table.dataTable tbody td {
   display: none;
 }
 
-/* Table cell truncation */
-#studies-table td:nth-child(2) {
+/* Table cell truncation (semantic classes survive column reordering) */
+#studies-table td.description-cell {
   max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -328,8 +328,7 @@ table.dataTable tbody td {
 }
 
 /* Reference columns - Author (Year) format with tooltip */
-#studies-table td:nth-child(5),
-#studies-table td:nth-child(6) {
+#studies-table td.ref-cell {
   white-space: nowrap;
 }
 
