@@ -6,8 +6,13 @@
 #'
 #' Usage: Rscript process-explorer-data.R [output_dir]
 
-# Capture any caller-supplied FRED_OFFLINE setting before FReD::.onLoad() sets its default (TRUE)
+# Capture caller-supplied env vars before FReD::.onLoad() sets its own defaults
+# (FReD defaults to FRED_OFFLINE=TRUE and an OSF FRED_DATA_URL).
+FRED_DATA_URL_DEFAULT <- "https://raw.githubusercontent.com/forrtproject/FReD-data/refs/heads/main/output/FReD.xlsx"
 caller_fred_offline <- Sys.getenv("FRED_OFFLINE", unset = NA_character_)
+caller_fred_url <- Sys.getenv("FRED_DATA_URL", unset = "")
+fred_url <- if (nzchar(trimws(caller_fred_url))) trimws(caller_fred_url) else FRED_DATA_URL_DEFAULT
+Sys.setenv(FRED_DATA_URL = fred_url)
 
 library(FReD)
 library(dplyr)
@@ -36,14 +41,10 @@ if (!dir.exists(OUTPUT_DIR)) {
 # Load FReD data using the package function
 cat("Loading FReD data...\n")
 if (!use_offline) {
-  # Download and verify the live OSF file explicitly before calling load_fred_data().
+  # Download and verify the live FReD workbook explicitly before calling load_fred_data().
   # FReD::read_fred() catches download/read errors and silently falls back to the
   # bundled package snapshot; failing fast here ensures CI carries forward the last
   # verified Release bundle rather than publishing stale snapshot data.
-  fred_url <- Sys.getenv("FRED_DATA_URL", unset = "")
-  if (!nzchar(fred_url)) {
-    fred_url <- "https://osf.io/2tbvd/download"
-  }
   tmp_fred_xlsx <- tempfile(fileext = ".xlsx")
   df <- tryCatch({
     cat("Downloading live FReD dataset from:", fred_url, "\n")

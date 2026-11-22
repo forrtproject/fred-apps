@@ -19,6 +19,7 @@ jobs:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       R_REMOTES_NO_ERRORS_FROM_WARNINGS: true
       FRED_OFFLINE: "FALSE"
+      FRED_DATA_URL: "https://raw.githubusercontent.com/forrtproject/FReD-data/refs/heads/main/output/FReD.xlsx"
       RELEASE_TAG: data-latest
 
     steps:
