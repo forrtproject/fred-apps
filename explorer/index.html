@@ -221,6 +221,13 @@
 
         <!-- Tab Content: Correlates -->
         <div class="tab-content" id="tab-correlates">
+          <div class="correlates-toolbar">
+            <span class="correlates-toolbar-label" id="correlates-mode-label">Show outcomes as</span>
+            <div class="segmented-toggle" role="group" aria-labelledby="correlates-mode-label">
+              <button type="button" class="segmented-toggle-btn active" data-correlates-mode="totals" aria-pressed="true">Totals</button>
+              <button type="button" class="segmented-toggle-btn" data-correlates-mode="shares" aria-pressed="false">Shares (%)</button>
+            </div>
+          </div>
           <div class="card">
             <div class="card-header chart-card-header">
               <div class="chart-card-title">
