@@ -90,12 +90,16 @@ FReD.charts.scatterplot = {
     const outcomeOrder = [
       'success', 'successful', 'successful replication',
       'success (homogeneous and jointly significantly above 0)',
+      'success (homogeneous and jointly significantly different from 0)',
       'statistically successful but flawed',
       'failure (not homogeneous but jointly significantly above 0)',
+      'failure (not homogeneous but jointly significantly different from 0)',
       'failure', 'failed', 'failed replication', 'informative failure',
-      'failure (reversal)',
       'failure (homogeneous but not significant)',
       'failure (not homogeneous and not significant)',
+      'failure (reversal)',
+      'failure (homogeneous but jointly significant in opposite direction)',
+      'failure (not homogeneous and jointly significant in opposite direction)',
       'mixed',
       'OS not significant', 'uninformative', 'descriptive only',
       'not calculable'

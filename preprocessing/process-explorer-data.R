@@ -182,13 +182,19 @@ parse_pval_operator <- function(pval_type) {
   return("=")
 }
 
+# Safely coerce character/factor/numeric values to numeric (avoids factor level codes)
+safe_as_numeric <- function(x) {
+  if (is.factor(x)) x <- as.character(x)
+  suppressWarnings(as.numeric(x))
+}
+
 # Helper function to determine if a p-value indicates significance (< alpha)
 # Returns TRUE (significant), FALSE (not significant), or NA (missing/indeterminate)
 is_pval_significant <- function(pval_value, pval_type, alpha = 0.05) {
   if (is.null(pval_value) || length(pval_value) == 0 || is.na(pval_value)) {
     return(NA)
   }
-  pval_num <- suppressWarnings(as.numeric(pval_value))
+  pval_num <- safe_as_numeric(pval_value)
   if (is.na(pval_num) || !is.finite(pval_num)) {
     return(NA)
   }
@@ -224,7 +230,7 @@ resolve_significance <- function(pval_value, pval_type, computed_p, alpha = 0.05
   if (!is.na(sig)) return(sig)
 
   if (!is.null(computed_p) && length(computed_p) > 0 && !is.na(computed_p)) {
-    p_num <- suppressWarnings(as.numeric(computed_p))
+    p_num <- safe_as_numeric(computed_p)
     if (!is.na(p_num) && is.finite(p_num)) {
       return(p_num < alpha)
     }
@@ -266,8 +272,8 @@ compute_significance_outcome <- function(row) {
   }
 
   # Both significant - check for reversal if direction is assessable
-  es_o <- suppressWarnings(as.numeric(row$es_o))
-  es_r <- suppressWarnings(as.numeric(row$es_r))
+  es_o <- safe_as_numeric(row$es_o)
+  es_r <- safe_as_numeric(row$es_r)
   direction_assessable <- isTRUE(is_direction_assessable(row$es_type_o, row$es_type_r, es_o, es_r))
 
   if (direction_assessable) {
@@ -306,8 +312,8 @@ studies <- df %>%
       gsub("&amp;", "&", trimws(as.character(orig_journal)), fixed = TRUE),
       stringr::str_extract(ref_o, "(?<=\\. )[^.]+(?=,? \\d{4})")
     ),
-    pval_value_o_num = suppressWarnings(as.numeric(pval_value_o)),
-    pval_value_r_num = suppressWarnings(as.numeric(pval_value_r)),
+    pval_value_o_num = safe_as_numeric(pval_value_o),
+    pval_value_r_num = safe_as_numeric(pval_value_r),
     # Determine if direction is assessable for this entry
     direction_assessable = is_direction_assessable(es_type_o, es_type_r, es_o, es_r)
   ) %>%
@@ -423,7 +429,7 @@ success_criteria_meta <- list(
   )
 )
 
-# Outcome colors
+# Outcome colors (reserve "darkred" strictly for reversals / opposite-direction failures)
 outcome_colors <- list(
   success = "#8FBC8F",
   Success = "#8FBC8F",
@@ -435,8 +441,12 @@ outcome_colors <- list(
   `Not calculable` = "#C8C8C8",
   `not calculable` = "#C8C8C8",
   `success (homogeneous and jointly significantly above 0)` = "#8FBC8F",
+  `success (homogeneous and jointly significantly different from 0)` = "#8FBC8F",
   `failure (not homogeneous but jointly significantly above 0)` = "#efa986",
-  `failure (not homogeneous and not significant)` = "darkred",
+  `failure (not homogeneous but jointly significantly different from 0)` = "#efa986",
+  `failure (homogeneous but jointly significant in opposite direction)` = "darkred",
+  `failure (not homogeneous and jointly significant in opposite direction)` = "darkred",
+  `failure (not homogeneous and not significant)` = "#CD5C5C",
   `failure (homogeneous but not significant)` = "#FF7F7F"
 )
 

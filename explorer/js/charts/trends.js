@@ -67,11 +67,16 @@ FReD.charts.trends = {
     const outcomeOrder = [
       'success', 'successful', 'successful replication',
       'success (homogeneous and jointly significantly above 0)',
+      'success (homogeneous and jointly significantly different from 0)',
       'statistically successful but flawed',
-      'failure', 'failed', 'failed replication', 'informative failure', 'failure (reversal)',
+      'failure', 'failed', 'failed replication', 'informative failure',
       'failure (not homogeneous but jointly significantly above 0)',
+      'failure (not homogeneous but jointly significantly different from 0)',
       'failure (homogeneous but not significant)',
       'failure (not homogeneous and not significant)',
+      'failure (reversal)',
+      'failure (homogeneous but jointly significant in opposite direction)',
+      'failure (not homogeneous and jointly significant in opposite direction)',
       'mixed',
       'OS not significant', 'uninformative', 'descriptive only', 'not calculable'
     ];
@@ -229,13 +234,19 @@ FReD.charts.trends = {
     // left of mixed instead of falling back to alphabetical order.
     const outcomeOrder = [
       // successes
-      'success', 'successful', 'success (homogeneous and jointly significantly above 0)',
+      'success', 'successful', 'successful replication',
+      'success (homogeneous and jointly significantly above 0)',
+      'success (homogeneous and jointly significantly different from 0)',
       'statistically successful but flawed',
       // failures
-      'failure', 'failed', 'informative failure', 'failure (reversal)',
+      'failure', 'failed', 'failed replication', 'informative failure',
       'failure (not homogeneous but jointly significantly above 0)',
+      'failure (not homogeneous but jointly significantly different from 0)',
       'failure (homogeneous but not significant)',
       'failure (not homogeneous and not significant)',
+      'failure (reversal)',
+      'failure (homogeneous but jointly significant in opposite direction)',
+      'failure (not homogeneous and jointly significant in opposite direction)',
       // mixed (aggregated references with differing replication outcomes)
       'mixed',
       // non-informative / not assessable

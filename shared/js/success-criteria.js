@@ -103,13 +103,23 @@ FReD.successCriteria = {
     'statistically successful but flawed': '#d88201',
     'Statistically successful but flawed': '#d88201',
 
-    // Homogeneity & significance specific
+    // Homogeneity & significance specific (supports both legacy "above 0" and
+    // direction-neutral "different from 0" / opposite-direction labels from FReD;
+    // reserves "darkred" strictly for reversals / opposite-direction failures)
     'success (homogeneous and jointly significantly above 0)': '#8FBC8F',
     'Success (homogeneous and jointly significantly above 0)': '#8FBC8F',
+    'success (homogeneous and jointly significantly different from 0)': '#8FBC8F',
+    'Success (homogeneous and jointly significantly different from 0)': '#8FBC8F',
     'failure (not homogeneous but jointly significantly above 0)': '#efa986',
     'Failure (not homogeneous but jointly significantly above 0)': '#efa986',
-    'failure (not homogeneous and not significant)': 'darkred',
-    'Failure (not homogeneous and not significant)': 'darkred',
+    'failure (not homogeneous but jointly significantly different from 0)': '#efa986',
+    'Failure (not homogeneous but jointly significantly different from 0)': '#efa986',
+    'failure (homogeneous but jointly significant in opposite direction)': 'darkred',
+    'Failure (homogeneous but jointly significant in opposite direction)': 'darkred',
+    'failure (not homogeneous and jointly significant in opposite direction)': 'darkred',
+    'Failure (not homogeneous and jointly significant in opposite direction)': 'darkred',
+    'failure (not homogeneous and not significant)': '#CD5C5C',
+    'Failure (not homogeneous and not significant)': '#CD5C5C',
     'failure (homogeneous but not significant)': '#FF7F7F',
     'Failure (homogeneous but not significant)': '#FF7F7F'
   },
@@ -157,8 +167,16 @@ FReD.successCriteria = {
       Object.assign(colors, {
         'success (homogeneous and jointly significantly above 0)': this.colors['success (homogeneous and jointly significantly above 0)'],
         'Success (homogeneous and jointly significantly above 0)': this.colors['Success (homogeneous and jointly significantly above 0)'],
+        'success (homogeneous and jointly significantly different from 0)': this.colors['success (homogeneous and jointly significantly different from 0)'],
+        'Success (homogeneous and jointly significantly different from 0)': this.colors['Success (homogeneous and jointly significantly different from 0)'],
         'failure (not homogeneous but jointly significantly above 0)': this.colors['failure (not homogeneous but jointly significantly above 0)'],
         'Failure (not homogeneous but jointly significantly above 0)': this.colors['Failure (not homogeneous but jointly significantly above 0)'],
+        'failure (not homogeneous but jointly significantly different from 0)': this.colors['failure (not homogeneous but jointly significantly different from 0)'],
+        'Failure (not homogeneous but jointly significantly different from 0)': this.colors['Failure (not homogeneous but jointly significantly different from 0)'],
+        'failure (homogeneous but jointly significant in opposite direction)': this.colors['failure (homogeneous but jointly significant in opposite direction)'],
+        'Failure (homogeneous but jointly significant in opposite direction)': this.colors['Failure (homogeneous but jointly significant in opposite direction)'],
+        'failure (not homogeneous and jointly significant in opposite direction)': this.colors['failure (not homogeneous and jointly significant in opposite direction)'],
+        'Failure (not homogeneous and jointly significant in opposite direction)': this.colors['Failure (not homogeneous and jointly significant in opposite direction)'],
         'failure (not homogeneous and not significant)': this.colors['failure (not homogeneous and not significant)'],
         'Failure (not homogeneous and not significant)': this.colors['Failure (not homogeneous and not significant)'],
         'failure (homogeneous but not significant)': this.colors['failure (homogeneous but not significant)'],
