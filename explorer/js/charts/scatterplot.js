@@ -1,7 +1,9 @@
 /**
  * FReD Explorer - Scatterplot Chart
  *
- * Creates an interactive scatterplot of original vs replication effect sizes
+ * Interactive scatterplot of original vs replication effect sizes rendered
+ * with Apache ECharts (SVG), including x = y line, y = 0 line, and
+ * significance rug marks along both axes.
  */
 
 window.FReD = window.FReD || {};
@@ -9,6 +11,7 @@ FReD.charts = FReD.charts || {};
 
 FReD.charts.scatterplot = {
   container: null,
+  actionsEl: null,
   lastStudies: null,
   lastCriterion: null,
 
@@ -17,18 +20,12 @@ FReD.charts.scatterplot = {
    */
   init(containerId) {
     this.container = document.getElementById(containerId);
+    this.actionsEl = document.getElementById(containerId + '-actions');
     if (!this.container) {
       console.error('Scatterplot container not found:', containerId);
       return;
     }
     this.container.classList.add('loading');
-
-    // Listen for theme changes
-    window.addEventListener('themechange', () => {
-      if (this.lastStudies && this.lastCriterion) {
-        this.render(this.lastStudies, this.lastCriterion);
-      }
-    });
   },
 
   /**
@@ -37,11 +34,8 @@ FReD.charts.scatterplot = {
   render(studies, criterion) {
     if (!this.container) return;
 
-    // Store for re-rendering on theme change
     this.lastStudies = studies;
     this.lastCriterion = criterion;
-
-    this.container.classList.add('loading');
 
     // Filter out studies without effect sizes
     const validStudies = studies.filter(s =>
@@ -50,201 +44,248 @@ FReD.charts.scatterplot = {
     );
 
     if (validStudies.length === 0) {
+      FReD.charts.unmount(this.container, this.actionsEl);
+      this.container.style.height = '';
       this.container.innerHTML = '<div class="alert alert-info">No studies with effect size data to display.</div>';
       this.container.classList.remove('loading');
       return;
     }
 
-    // Get colors for current criterion
-    const colors = FReD.successCriteria.getColorsForCriterion(criterion);
-
-    // Group studies by outcome for coloring
-    const tracesByOutcome = {};
+    // Group studies by outcome
+    const groups = {};
+    const tableRows = [];
 
     validStudies.forEach(study => {
-      const { outcomeReport, color } = FReD.successCriteria.getOutcome(study, criterion);
+      const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
       const outcome = FReD.utils.capFirstLetter(outcomeReport || 'Not calculable');
 
-      if (!tracesByOutcome[outcome]) {
-        tracesByOutcome[outcome] = {
-          x: [],
-          y: [],
-          text: [],
-          color: colors[outcome] || colors[outcomeReport] || colors['Not calculable']
-        };
+      if (!groups[outcome]) {
+        groups[outcome] = [];
       }
+      groups[outcome].push(study);
 
-      tracesByOutcome[outcome].x.push(study.es_o);
-      tracesByOutcome[outcome].y.push(study.es_r);
-      tracesByOutcome[outcome].text.push(
-        `${study.description || 'No description'}<br>` +
-        `r(original) = ${FReD.utils.formatNumber(study.es_o, 3)}<br>` +
-        `r(replication) = ${FReD.utils.formatNumber(study.es_r, 3)}`
-      );
+      tableRows.push([
+        study.description || 'No description',
+        outcome,
+        Number(study.es_o),
+        Number(study.es_r),
+        study.p_o != null && !isNaN(study.p_o) ? Number(study.p_o) : '',
+        study.p_r != null && !isNaN(study.p_r) ? Number(study.p_r) : ''
+      ]);
     });
 
-    // Create scatter traces
-    const traces = [];
-
-    // Define order for legend
     const outcomeOrder = [
-      'Success', 'success',
-      'Failure', 'failure',
-      'Failure (reversal)', 'failure (reversal)',
-      'OS not significant',
-      'Not calculable', 'not calculable'
+      'Success', 'Successful', 'Successful replication',
+      'Success (homogeneous and jointly significantly above 0)',
+      'Statistically successful but flawed',
+      'Failure (not homogeneous but jointly significantly above 0)',
+      'Failure', 'Failed', 'Failed replication', 'Informative failure',
+      'Failure (reversal)',
+      'Failure (homogeneous but not significant)',
+      'Failure (not homogeneous and not significant)',
+      'Mixed',
+      'OS not significant', 'Uninformative', 'Descriptive only',
+      'Not calculable', 'Not coded'
     ];
 
-    // Sort outcomes for consistent legend order
-    const sortedOutcomes = Object.keys(tracesByOutcome).sort((a, b) => {
-      const aIdx = outcomeOrder.findIndex(o => a.toLowerCase().includes(o.toLowerCase()));
-      const bIdx = outcomeOrder.findIndex(o => b.toLowerCase().includes(o.toLowerCase()));
+    const sortedOutcomes = Object.keys(groups).sort((a, b) => {
+      const aIdx = outcomeOrder.findIndex(o => a.toLowerCase() === o.toLowerCase());
+      const bIdx = outcomeOrder.findIndex(o => b.toLowerCase() === o.toLowerCase());
       return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
     });
 
-    sortedOutcomes.forEach(outcome => {
-      const data = tracesByOutcome[outcome];
-      traces.push({
-        x: data.x,
-        y: data.y,
-        text: data.text,
-        type: 'scatter',
-        mode: 'markers',
-        name: outcome,
-        marker: {
-          color: data.color,
-          size: Math.max(6, 12 - Math.log10(validStudies.length) * 2),
-          line: { color: FReD.themeToggle.token('--white', '#ffffff'), width: 1 }
-        },
-        hovertemplate: '%{text}<extra></extra>'
-      });
-    });
+    const criterionInfo = FReD.successCriteria.getCriterion(criterion);
+    const criterionLabel = criterionInfo ? criterionInfo.label : criterion;
 
-    // Add diagonal line (x = y)
-    traces.push({
-      x: [0, 1],
-      y: [0, 1],
-      type: 'scatter',
-      mode: 'lines',
-      name: 'x = y',
-      line: { color: FReD.themeToggle.token('--border', '#d0d1d1'), dash: 'solid' },
-      hoverinfo: 'skip',
-      showlegend: false
-    });
-
-    // Add horizontal line at y = 0
-    traces.push({
-      x: [0, 1],
-      y: [0, 0],
-      type: 'scatter',
-      mode: 'lines',
-      name: 'y = 0',
-      line: { color: FReD.themeToggle.token('--text-faint', '#696969'), dash: 'dash' },
-      hoverinfo: 'skip',
-      showlegend: false
-    });
-
-    // Create rug plots for significance (colours from theme tokens)
-    const rug = FReD.successCriteria.rugColors;
-    const sigOriginal = validStudies.filter(s => s.p_o != null && s.p_o < 0.05);
-    const nsOriginal = validStudies.filter(s => s.p_o != null && s.p_o >= 0.05);
-    const sigReplication = validStudies.filter(s => s.p_r != null && s.p_r < 0.05);
-    const nsReplication = validStudies.filter(s => s.p_r != null && s.p_r >= 0.05);
-
-    // Bottom rug (original significance) - using bar shapes for better visibility
-    if (sigOriginal.length > 0) {
-      traces.push({
-        x: sigOriginal.map(s => s.es_o),
-        y: sigOriginal.map(() => -0.52),
-        type: 'scatter',
-        mode: 'markers',
-        marker: { symbol: 'line-ns', size: 12, color: rug.significant, line: { width: 2, color: rug.significant } },
-        hoverinfo: 'skip',
-        showlegend: false
-      });
-    }
-
-    if (nsOriginal.length > 0) {
-      traces.push({
-        x: nsOriginal.map(s => s.es_o),
-        y: nsOriginal.map(() => -0.52),
-        type: 'scatter',
-        mode: 'markers',
-        marker: { symbol: 'line-ns', size: 12, color: rug.notSignificant, line: { width: 2, color: rug.notSignificant } },
-        hoverinfo: 'skip',
-        showlegend: false
-      });
-    }
-
-    // Left rug (replication significance)
-    if (sigReplication.length > 0) {
-      traces.push({
-        x: sigReplication.map(() => -0.02),
-        y: sigReplication.map(s => s.es_r),
-        type: 'scatter',
-        mode: 'markers',
-        marker: { symbol: 'line-ew', size: 12, color: rug.significant, line: { width: 2, color: rug.significant } },
-        hoverinfo: 'skip',
-        showlegend: false
-      });
-    }
-
-    if (nsReplication.length > 0) {
-      traces.push({
-        x: nsReplication.map(() => -0.02),
-        y: nsReplication.map(s => s.es_r),
-        type: 'scatter',
-        mode: 'markers',
-        marker: { symbol: 'line-ew', size: 12, color: rug.notSignificant, line: { width: 2, color: rug.notSignificant } },
-        hoverinfo: 'skip',
-        showlegend: false
-      });
-    }
-
-    // Get theme-aware layout
-    const themeLayout = FReD.themeToggle ? FReD.themeToggle.getPlotlyLayout() : {};
-
-    const layout = {
-      paper_bgcolor: themeLayout.paper_bgcolor || '#FFFFFF',
-      plot_bgcolor: themeLayout.plot_bgcolor || '#FFFFFF',
-      font: themeLayout.font || {},
-      xaxis: {
-        title: 'Original Effect Size (r)',
-        range: [-0.05, 1.05],
-        fixedrange: true,
-        dtick: 0.25,
-        gridcolor: themeLayout.xaxis?.gridcolor,
-        linecolor: themeLayout.xaxis?.linecolor,
-        tickcolor: themeLayout.xaxis?.tickcolor
-      },
-      yaxis: {
-        title: 'Replication Effect Size (r)',
-        range: [-0.55, 1.05],
-        fixedrange: true,
-        dtick: 0.25,
-        gridcolor: themeLayout.yaxis?.gridcolor,
-        linecolor: themeLayout.yaxis?.linecolor,
-        tickcolor: themeLayout.yaxis?.tickcolor
-      },
-      legend: {
-        orientation: 'h',
-        y: 1.1,
-        x: 0.5,
-        xanchor: 'center',
-        bgcolor: 'transparent',
-        font: themeLayout.legend?.font || {}
-      },
-      margin: { t: 60, r: 20, b: 60, l: 60 },
-      hovermode: 'closest'
+    const table = {
+      headers: ['Description', 'Outcome', 'Original r', 'Replication r', 'Original p', 'Replication p'],
+      rows: tableRows,
+      summary: `Original vs. replication effect sizes for ${validStudies.length.toLocaleString('en-GB')} effects with numeric effect sizes (${criterionLabel}).`
     };
 
-    const config = {
-      displayModeBar: false,
-      responsive: true
+    // Significance rug data (pre-partitioned)
+    const bottomRugData = [];
+    const leftRugData = [];
+    validStudies.forEach(s => {
+      if (s.p_o != null && !isNaN(s.p_o)) {
+        bottomRugData.push([s.es_o, -0.52, s.p_o < 0.05 ? 1 : 0]);
+      }
+      if (s.p_r != null && !isNaN(s.p_r)) {
+        leftRugData.push([-0.02, s.es_r, s.p_r < 0.05 ? 1 : 0]);
+      }
+    });
+
+    const pointSize = Math.max(6, Math.round((12 - Math.log10(validStudies.length) * 2) * 10) / 10);
+
+    const optionFn = ({ width }) => {
+      const t = FReD.charts.chartTheme();
+      const rug = FReD.successCriteria.rugColors;
+      const series = [];
+
+      // Outcome scatter series (distinct colour + distinct marker shape)
+      sortedOutcomes.forEach((outcome, idx) => {
+        const color = FReD.successCriteria.getColor(outcome);
+        const symbol = FReD.charts.outcomeSymbol(outcome);
+        const pts = groups[outcome].map(study => ({
+          value: [study.es_o, study.es_r],
+          description: study.description || 'No description',
+          outcome: outcome,
+          color: color
+        }));
+
+        const sObj = {
+          name: outcome,
+          type: 'scatter',
+          symbol: symbol,
+          symbolSize: pointSize,
+          itemStyle: {
+            color: color,
+            borderColor: t.paper,
+            borderWidth: 1,
+            opacity: 0.9
+          },
+          emphasis: {
+            scale: 1.35,
+            itemStyle: { opacity: 1 }
+          },
+          data: pts
+        };
+
+        // Attach reference lines (x = y and y = 0) to the first series
+        if (idx === 0) {
+          sObj.markLine = {
+            silent: true,
+            symbol: ['none', 'none'],
+            animation: false,
+            label: { show: false },
+            data: [
+              [
+                { coord: [0, 0], lineStyle: { color: t.rule, type: 'solid', width: 1.5 } },
+                { coord: [1, 1] }
+              ],
+              [
+                { coord: [0, 0], lineStyle: { color: t.rule, type: 'dashed', width: 1.5 } },
+                { coord: [1, 0] }
+              ]
+            ]
+          };
+        }
+
+        series.push(sObj);
+      });
+
+      // Bottom rug (original study significance)
+      if (bottomRugData.length > 0) {
+        series.push({
+          name: '_rug_orig',
+          type: 'custom',
+          silent: true,
+          z: 2,
+          renderItem: function (params, api) {
+            const pt = api.coord([api.value(0), api.value(1)]);
+            const isSig = api.value(2) === 1;
+            return {
+              type: 'line',
+              shape: { x1: pt[0], y1: pt[1] - 5, x2: pt[0], y2: pt[1] + 5 },
+              style: {
+                stroke: isSig ? rug.significant : rug.notSignificant,
+                lineWidth: 1.5,
+                opacity: 0.75
+              }
+            };
+          },
+          data: bottomRugData
+        });
+      }
+
+      // Left rug (replication study significance)
+      if (leftRugData.length > 0) {
+        series.push({
+          name: '_rug_rep',
+          type: 'custom',
+          silent: true,
+          z: 2,
+          renderItem: function (params, api) {
+            const pt = api.coord([api.value(0), api.value(1)]);
+            const isSig = api.value(2) === 1;
+            return {
+              type: 'line',
+              shape: { x1: pt[0] - 5, y1: pt[1], x2: pt[0] + 5, y2: pt[1] },
+              style: {
+                stroke: isSig ? rug.significant : rug.notSignificant,
+                lineWidth: 1.5,
+                opacity: 0.75
+              }
+            };
+          },
+          data: leftRugData
+        });
+      }
+
+      const tooltip = {
+        trigger: 'item',
+        formatter: p => {
+          const d = p.data || {};
+          const xVal = Array.isArray(d.value) ? d.value[0] : p.value?.[0];
+          const yVal = Array.isArray(d.value) ? d.value[1] : p.value?.[1];
+          return FReD.charts.tipLines([
+            `<strong>${FReD.charts.escapeHtml(d.description || 'No description')}</strong>`,
+            FReD.charts.tipRow(d.color || p.color, d.outcome || p.seriesName),
+            `r(original) = ${FReD.utils.formatNumber(xVal, 3)}`,
+            `r(replication) = ${FReD.utils.formatNumber(yVal, 3)}`
+          ]);
+        }
+      };
+
+      const majorGridColors = ['transparent', t.grid, 'transparent', 'transparent', 'transparent'];
+
+      return FReD.charts.finishOption({
+        series: series,
+        tooltip: tooltip,
+        xAxis: FReD.charts.valueAxis({
+          name: 'Original Effect Size (r)',
+          nameGap: 32,
+          min: -0.05,
+          max: 1.05,
+          interval: 0.05,
+          splitLine: { lineStyle: { color: majorGridColors } },
+          axisLabel: {
+            interval: 0,
+            formatter: v => {
+              const r = Math.round(v * 100);
+              return (r >= 0 && r <= 100 && r % 25 === 0) ? (r / 100).toFixed(2) : '';
+            }
+          }
+        }),
+        yAxis: FReD.charts.valueAxis({
+          name: 'Replication Effect Size (r)',
+          nameGap: 44,
+          min: -0.55,
+          max: 1.05,
+          interval: 0.05,
+          splitLine: { lineStyle: { color: majorGridColors } },
+          axisLabel: {
+            interval: 0,
+            formatter: v => {
+              const r = Math.round(v * 100);
+              return (r >= -50 && r <= 100 && r % 25 === 0) ? (r / 100).toFixed(2) : '';
+            }
+          }
+        }),
+        grid: { left: 40, right: 18, top: 12, bottom: 28, containLabel: true }
+      }, { width });
     };
 
-    Plotly.newPlot(this.container, traces, layout, config);
     this.container.classList.remove('loading');
+
+    FReD.charts.mount(this.container, {
+      title: `Effect size comparison (${criterionLabel})`,
+      option: optionFn,
+      height: 500,
+      aspect: 0.62,
+      table: table,
+      actionsEl: this.actionsEl
+    });
   },
 
   /**
@@ -252,7 +293,7 @@ FReD.charts.scatterplot = {
    */
   clear() {
     if (this.container) {
-      Plotly.purge(this.container);
+      FReD.charts.unmount(this.container, this.actionsEl);
       this.container.innerHTML = '';
     }
   }

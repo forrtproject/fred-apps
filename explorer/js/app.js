@@ -271,6 +271,22 @@ FReD.explorer = {
         document.getElementById('about-modal')?.classList.add('active');
       });
     }
+
+    // Mobile topbar menu toggle (<= 960px)
+    const menuBtn = document.getElementById('topbar-menu-btn');
+    const headerNav = document.getElementById('header-nav');
+    if (menuBtn && headerNav) {
+      menuBtn.addEventListener('click', () => {
+        const isOpen = headerNav.classList.toggle('open');
+        menuBtn.setAttribute('aria-expanded', String(isOpen));
+      });
+      headerNav.addEventListener('click', (e) => {
+        if (e.target.closest('a')) {
+          headerNav.classList.remove('open');
+          menuBtn.setAttribute('aria-expanded', 'false');
+        }
+      });
+    }
   },
 
   /**

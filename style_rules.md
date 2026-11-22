@@ -37,30 +37,34 @@ and JavaScript read tokens; they never hard-code colours.
 | `--border-light` | `#e0e1e1` | `#383236` |
 
 ### Outcomes: these encode data, not decoration
-Every surface (CSS, Plotly charts, legends, badges, reports) uses the same mapping.
+There are two distinct outcome palettes:
+- **UI chrome** (badges, alerts, verdict text) uses the Atlas status tokens (`--success`, `--warning`, `--error`).
+- **ECharts figures** (bars, scatter points, trend lines, legends) use the FLoRA Explorer `--color-chart-*` palette (`forrtproject/flora-explorer`, `react-frontend` branch `src/styles/tokens.css`), tuned so in-bar labels stay readable and series marks keep at least 3:1 contrast in dark mode.
 
-| Meaning | Fill / dot / bar | Text | Tint background | Border |
+| UI Meaning | Fill / dot | Text | Tint background | Border |
 |---|---|---|---|---|
 | Success | `--success` | `--success-light` | `--success-bg` | `--success-border` |
 | Mixed | `--warning` (fills only, fails AA as text) | `--warning-text` | `--warning-bg` | `--warning-border` |
 | Failure | `--error` | `--error` | `--error-bg` | `--error-border` |
-| Not coded / not calculable | `--outcome-na` | `--text-muted` | `--surface-alt` | `--border` |
+| Not coded / not calculable | `--border` | `--text-muted` | `--surface-alt` | `--border` |
 
-Chart categories the Atlas does not define (derived from the same family):
-
-| Token | Light | Dark | Outcome labels |
+| Chart Token | Light | Dark | Outcome labels |
 |---|---|---|---|
-| `--outcome-reversal` | `#7a1610` | `#dc2626` | failure (reversal); failure (not homogeneous and not significant) |
-| `--outcome-failure-partial` | `#e8857a` | `#fdba9f` | failure (not homogeneous but jointly significant) |
-| `--outcome-os-ns` | `#9a9c9c` | `#8a8f8f` | OS not significant; uninformative |
-| `--outcome-descriptive` | `#8a9bb0` | `#8fa3bd` | descriptive only |
-| `--outcome-flawed` | `#c2410c` | `#f97316` | statistically successful but flawed |
-| `--sig-yes` / `--sig-no` | plum / `--text-faint` | | Scatterplot significance rugs |
-| `--study-original` / `--study-replication` | plum / `#7a7a7a` | plum / `#a9a1a6` | Forest plot and CI mini-chart |
+| `--color-chart-successful` | `#248073` | `#7ad9b5` | success, successful, successful replication, homogeneous & jointly significant |
+| `--color-chart-failed` | `#c24a33` | `#f08570` | failure, failed, failed replication, informative failure, homogeneous & not significant |
+| `--color-chart-technical-failure` | `#7a2a23` | `#d9645a` | failure (reversal), not homogeneous & not significant |
+| `--color-chart-failure-partial` | `#d0684b` | `#f4a582` | failure (not homogeneous but jointly significantly above 0) |
+| `--color-chart-mixed` | `#d9a441` | `#e3b657` | mixed |
+| `--color-chart-qualified` | `#7b61a8` | `#c0a8fa` | statistically successful but flawed |
+| `--color-chart-descriptive` | `#5d7186` | `#7a92a8` | descriptive only |
+| `--color-chart-uninformative` | `#a3907a` | `#c2b29c` | OS not significant, uninformative |
+| `--color-chart-not-coded` | `#c3c7ce` | `#5a5f69` | not calculable, not coded (deliberately faint: unassessed) |
+| `--color-chart-original` / `--color-chart-replication` | `#853953` / `#6f7686` | `#d68aa7` / `#a3a9b6` | Forest plot original (circle) and replication (diamond) |
+| `--sig-yes` / `--sig-no` | `#853953` / `#696969` | `#d68aa7` / `#958d92` | Scatterplot significance rugs |
 
 The label → token map lives in `FReD.successCriteria.colorTokens`
 ([shared/js/success-criteria.js](shared/js/success-criteria.js)). Never use colour
-alone: every chart keeps a legend or label.
+alone: every chart pairs colour with legends, labels, or distinct marker shapes.
 
 ---
 
@@ -114,22 +118,14 @@ alone: every chart keeps a legend or label.
 2. Applies `data-theme="light|dark"` on `<html>`; dark mode only overrides tokens.
 3. Dispatches a `themechange` event; charts re-render on it.
 
-## Plotly charts
+## ECharts figures (FReD Explorer)
 
-Read colours at render time so charts follow the theme:
+Explorer renders every chart with **Apache ECharts 6.1.0** using the **SVG renderer** (`renderer: 'svg'`) via the shared helpers in [`shared/js/charts.js`](shared/js/charts.js) (ported from `forrtproject/flora-explorer` `react-frontend`):
 
-```javascript
-const themeLayout = FReD.themeToggle.getPlotlyLayout(); // background, grid, fonts, hover label
-const colors = FReD.successCriteria.getColorsForCriterion(criterion); // outcome colours
-const original = FReD.themeToggle.token('--study-original', '#853953'); // any single token
-const label = FReD.themeToggle.textOn(segmentColor); // readable text on a filled bar
-```
-
-```javascript
-window.addEventListener('themechange', () => {
-  if (this.lastData) this.render(this.lastData);
-});
-```
+- `FReD.charts.finishOption(option, { width })` applies the shared paper ground (`--white`), `--font-body`, top-left circular legend, dark HTML-escaped tooltips, and `prefers-reduced-motion` animation gating.
+- `FReD.charts.valueAxis()`, `categoryAxis()`, `countAxis()`, `stackCorners()`, `labelColor()`, and `horizontalBarHeight()` keep axis and bar styling consistent across views.
+- `FReD.charts.mount(container, spec)` defers initialisation until the container has non-zero width (hidden tabs), redraws on resize and `themechange`, adds `role="img"` + `aria-label`, renders a keyboard-accessible **"View chart data"** `<details>` table underneath, and wires a **"Copy chart CSV"** button (formula-injection safe).
+- `FReD.charts.exportSvg()` and `FReD.charts.exportPng()` provide crisp SVG and 2× PNG downloads for the forest plot.
 
 ---
 
@@ -137,7 +133,6 @@ window.addEventListener('themechange', () => {
 
 | Breakpoint | Change |
 |---|---|
-| `992px` | Sidebar layout collapses to one column |
+| `960px` | Sidebar collapses to one column; top bar collapses to a hamburger menu |
 | `768px` | Card headers stack; landing app cells stack |
-| `720px` | Top bar wraps |
-| `576px` | Base font 14px; top-bar subtitle hidden; footer stacks |
+| `640px` | Base font 14px; top-bar subtitle hidden; footer stacks |
