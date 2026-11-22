@@ -65,12 +65,16 @@ FReD.charts.trends = {
     const outcomeOrder = [
       'success', 'successful', 'successful replication',
       'success (homogeneous and jointly significantly above 0)',
+      'success (homogeneous and jointly significantly different from 0)',
       'statistically successful but flawed',
       'failure (not homogeneous but jointly significantly above 0)',
+      'failure (not homogeneous but jointly significantly different from 0)',
       'failure', 'failed', 'failed replication', 'informative failure',
-      'failure (reversal)',
       'failure (homogeneous but not significant)',
       'failure (not homogeneous and not significant)',
+      'failure (reversal)',
+      'failure (homogeneous but jointly significant in opposite direction)',
+      'failure (not homogeneous and jointly significant in opposite direction)',
       'mixed',
       'os not significant', 'uninformative', 'descriptive only',
       'not calculable', 'not coded'
@@ -94,8 +98,9 @@ FReD.charts.trends = {
     // Aggregate by reference to avoid counting same original multiple times
     const aggregated = FReD.dataLoader.aggregateByReference(studies, criterion);
 
+    // Extract years and decades (prefer pre-extracted orig_year over regex fallback)
     const withDecade = aggregated.map(item => {
-      const year = FReD.utils.extractYear(item.ref_o);
+      const year = item.orig_year || FReD.utils.extractYear(item.ref_o);
       const decade = year ? FReD.utils.getDecade(year) : null;
       return { ...item, year, decade };
     }).filter(item => item.decade && item.decade >= 1950 && item.decade <= 2020);

@@ -6,9 +6,23 @@
 #'
 #' Usage: Rscript process-explorer-data.R [output_dir]
 
+# Capture caller-supplied env vars before FReD::.onLoad() sets its own defaults
+# (FReD defaults to FRED_OFFLINE=TRUE and an OSF FRED_DATA_URL).
+FRED_DATA_URL_DEFAULT <- "https://raw.githubusercontent.com/forrtproject/FReD-data/refs/heads/main/output/FReD.xlsx"
+caller_fred_offline <- Sys.getenv("FRED_OFFLINE", unset = NA_character_)
+caller_fred_url <- Sys.getenv("FRED_DATA_URL", unset = "")
+fred_url <- if (nzchar(trimws(caller_fred_url))) trimws(caller_fred_url) else FRED_DATA_URL_DEFAULT
+Sys.setenv(FRED_DATA_URL = fred_url)
+
 library(FReD)
 library(dplyr)
 library(jsonlite)
+
+# Use live online FReD data unless the caller explicitly requested offline mode
+use_offline <- identical(toupper(trimws(caller_fred_offline)), "TRUE")
+if (!use_offline) {
+  use_FReD_offline(FALSE)
+}
 
 # Configuration
 OUTPUT_DIR <- commandArgs(trailingOnly = TRUE)[1]
@@ -26,7 +40,31 @@ if (!dir.exists(OUTPUT_DIR)) {
 
 # Load FReD data using the package function
 cat("Loading FReD data...\n")
-df <- load_fred_data(verbose = TRUE)
+if (!use_offline) {
+  # Download and verify the live FReD workbook explicitly before calling load_fred_data().
+  # FReD::read_fred() catches download/read errors and silently falls back to the
+  # bundled package snapshot; failing fast here ensures CI carries forward the last
+  # verified Release bundle rather than publishing stale snapshot data.
+  tmp_fred_xlsx <- tempfile(fileext = ".xlsx")
+  df <- tryCatch({
+    cat("Downloading live FReD dataset from:", fred_url, "\n")
+    dl_status <- utils::download.file(fred_url, tmp_fred_xlsx, mode = "wb", quiet = FALSE)
+    if (!identical(as.integer(dl_status), 0L) || !file.exists(tmp_fred_xlsx) || file.info(tmp_fred_xlsx)$size == 0) {
+      stop("Failed to download live FReD dataset from ", fred_url)
+    }
+    # Verify workbook is readable before handing off to FReD::load_fred_data()
+    probe_df <- openxlsx::read.xlsx(tmp_fred_xlsx, sheet = 1, rows = 1:5)
+    if (!is.data.frame(probe_df) || nrow(probe_df) == 0) {
+      stop("Downloaded FReD workbook appears empty or unreadable: ", tmp_fred_xlsx)
+    }
+    load_fred_data(data = tmp_fred_xlsx, verbose = TRUE)
+  }, finally = {
+    if (file.exists(tmp_fred_xlsx)) unlink(tmp_fred_xlsx)
+  })
+} else {
+  cat("Using FReD offline mode (FRED_OFFLINE=TRUE)\n")
+  df <- load_fred_data(verbose = TRUE)
+}
 
 cat("Loaded", nrow(df), "studies\n")
 
@@ -57,10 +95,20 @@ compute_all_outcomes <- function(row) {
         criterion = criterion
       )
 
+      outcome_val <- result$outcome
+      outcome_detailed_val <- result$outcome_detailed
+      outcome_report_val <- result$outcome_report
+
+      # FReD's homogeneity_significance returns "not coded" when outcome is NA;
+      # normalize to NA_character_ so all computed criteria consistently display "Not calculable".
+      if (isTRUE(is.na(outcome_val)) && isTRUE(tolower(outcome_report_val) == "not coded")) {
+        outcome_report_val <- NA_character_
+      }
+
       outcomes[[criterion]] <- list(
-        outcome = result$outcome,
-        outcome_detailed = result$outcome_detailed,
-        outcome_report = result$outcome_report
+        outcome = outcome_val,
+        outcome_detailed = outcome_detailed_val,
+        outcome_report = outcome_report_val
       )
     }, error = function(e) {
       outcomes[[criterion]] <<- list(
@@ -91,69 +139,126 @@ cat("\nBuilding JSON structure...\n")
 # Define directional effect types (can detect reversals)
 DIRECTIONAL_ES_TYPES <- c(
   "r", "d", "g", "t", "z", "test statistic", "b", "beta",
-  "odds ratio", "mean difference", "phi", "OR", "hedges' g",
-  "Cohen's d", "b (unstd)", "beta (std)", "partial r", "partial correlation"
+  "odds ratio", "mean difference", "median difference", "percentage difference",
+  "phi", "OR", "hedges' g", "Cohen's d", "dz", "Cohen's dz", "d_sample (dep)",
+  "b (unstd)", "beta (std)", "partial r", "partial correlation",
+  "semipartial correlation", "rho (spearman's rank cor)", "Wilcoxon r",
+  "log_odds_ratio", "hazard ratio", "path_coefficient"
 )
 
-# Helper function to determine if a p-value indicates significance (< 0.05)
-is_pval_significant <- function(pval_value, pval_type) {
-  if (is.na(pval_value)) return(NA)
-  if (is.na(pval_type)) {
-    # If type is missing, assume exact
-    return(pval_value < 0.05)
-  }
-  # l (<) means p < reported value
-  if (grepl("l|<", pval_type, ignore.case = TRUE)) {
-    return(pval_value <= 0.05)
-  }
-  # e (=) means p = reported value (exact)
-  if (grepl("e|=", pval_type, ignore.case = TRUE)) {
-    return(pval_value < 0.05)
-  }
-  # g (>) means p > reported value - only significant if value itself is < 0.05 (unlikely)
-  if (grepl("g|>", pval_type, ignore.case = TRUE)) {
-    return(FALSE)  # p > X can never confirm p < 0.05
-  }
-  # Default: treat as exact
-  return(pval_value < 0.05)
+# Direction is assessable only when BOTH original and replication use directional
+# effect size types and both common-metric effect sizes are available.
+is_direction_assessable <- function(es_type_o, es_type_r, es_o, es_r) {
+  directional_lower <- tolower(DIRECTIONAL_ES_TYPES)
+  !is.na(es_type_o) &
+    tolower(as.character(es_type_o)) %in% directional_lower &
+    !is.na(es_type_r) &
+    tolower(as.character(es_type_r)) %in% directional_lower &
+    !is.na(es_o) & !is.na(es_r)
 }
 
-# Compute significance_r outcome using raw p-values
-compute_significance_outcome <- function(row) {
-  pval_o <- row$pval_value_o
-  pval_type_o <- row$pval_type_o
-  pval_r <- row$pval_value_r
-  pval_type_r <- row$pval_type_r
-  es_o <- row$es_o
-  es_r <- row$es_r
-  es_type_o <- row$es_type_o
+# Parse coded p-value comparison operator into one of: ">=", ">", "<=", "<", "="
+parse_pval_operator <- function(pval_type) {
+  if (is.null(pval_type) || length(pval_type) == 0 || is.na(pval_type)) {
+    return("=")
+  }
+  pt <- tolower(trimws(as.character(pval_type)))
+  if (pt == "") return("=")
 
-  # Check if we can calculate
-  if (is.na(pval_o) || is.na(pval_r)) {
+  # Inspect symbolic operators first so strings like "ge (>=)", "ge (>)",
+  # "le (<=)", '"<"', and '"="' map unambiguously before checking letter codes.
+  if (grepl(">=", pt, fixed = TRUE)) return(">=")
+  if (grepl("<=", pt, fixed = TRUE)) return("<=")
+  if (grepl(">", pt, fixed = TRUE)) return(">")
+  if (grepl("<", pt, fixed = TRUE)) return("<")
+
+  # Fallback to letter codes when no symbolic operator is present
+  if (grepl("\\bge\\b", pt)) return(">=")
+  if (grepl("\\ble\\b", pt)) return("<=")
+  if (grepl("\\bg\\b", pt)) return(">")
+  if (grepl("\\bl\\b", pt)) return("<")
+  if (grepl("=|\\be\\b", pt)) return("=")
+
+  return("=")
+}
+
+# Safely coerce character/factor/numeric values to numeric (avoids factor level codes)
+safe_as_numeric <- function(x) {
+  if (is.factor(x)) x <- as.character(x)
+  suppressWarnings(as.numeric(x))
+}
+
+# Helper function to determine if a p-value indicates significance (< alpha)
+# Returns TRUE (significant), FALSE (not significant), or NA (missing/indeterminate)
+is_pval_significant <- function(pval_value, pval_type, alpha = 0.05) {
+  if (is.null(pval_value) || length(pval_value) == 0 || is.na(pval_value)) {
+    return(NA)
+  }
+  pval_num <- safe_as_numeric(pval_value)
+  if (is.na(pval_num) || !is.finite(pval_num)) {
+    return(NA)
+  }
+
+  op <- parse_pval_operator(pval_type)
+
+  if (op == "<") {
+    # p < X guarantees p < alpha only when X <= alpha; otherwise indeterminate (e.g., p < 0.10)
+    if (pval_num <= alpha) return(TRUE)
+    return(NA)
+  }
+  if (op == "<=") {
+    # p <= 0.05 is treated as significant (standard NHST reporting convention where authors
+    # report "p <= .05" for significant results), whereas exact "p = 0.05" below is treated
+    # as not significant (strict p < 0.05, matching FReD::assess_replication_outcome).
+    # Bounds above alpha (e.g. p <= 0.72) are indeterminate.
+    if (pval_num <= alpha) return(TRUE)
+    return(NA)
+  }
+  if (op %in% c(">", ">=")) {
+    # p > X or p >= X guarantees non-significance only when X >= alpha; otherwise indeterminate (e.g., p > 0.01)
+    if (pval_num >= alpha) return(FALSE)
+    return(NA)
+  }
+
+  # Exact equality (p = X)
+  return(pval_num < alpha)
+}
+
+# Resolve significance from reported p-value, falling back to ES-derived p-value when missing/indeterminate
+resolve_significance <- function(pval_value, pval_type, computed_p, alpha = 0.05) {
+  sig <- is_pval_significant(pval_value, pval_type, alpha = alpha)
+  if (!is.na(sig)) return(sig)
+
+  if (!is.null(computed_p) && length(computed_p) > 0 && !is.na(computed_p)) {
+    p_num <- safe_as_numeric(computed_p)
+    if (!is.na(p_num) && is.finite(p_num)) {
+      return(p_num < alpha)
+    }
+  }
+  return(NA)
+}
+
+# Compute significance_r outcome using reported p-values with fallback to computed p-values
+compute_significance_outcome <- function(row) {
+  sig_o <- resolve_significance(row$pval_value_o, row$pval_type_o, row$p_value_o)
+
+  # Original not significant: classify immediately even if replication p-value is missing
+  # (matches FReD::assess_replication_outcome)
+  if (isFALSE(sig_o)) {
     return(list(
-      outcome = "not calculable",
-      outcome_detailed = "not calculable",
-      outcome_report = "Not calculable"
+      outcome = "OS not significant",
+      outcome_detailed = "OS not significant",
+      outcome_report = "OS not significant"
     ))
   }
 
-  sig_o <- is_pval_significant(pval_o, pval_type_o)
-  sig_r <- is_pval_significant(pval_r, pval_type_r)
+  sig_r <- resolve_significance(row$pval_value_r, row$pval_type_r, row$p_value_r)
 
   if (is.na(sig_o) || is.na(sig_r)) {
     return(list(
       outcome = "not calculable",
       outcome_detailed = "not calculable",
       outcome_report = "Not calculable"
-    ))
-  }
-
-  # Original not significant
-  if (!sig_o) {
-    return(list(
-      outcome = "OS not significant",
-      outcome_detailed = "OS not significant",
-      outcome_report = "OS not significant"
     ))
   }
 
@@ -166,11 +271,10 @@ compute_significance_outcome <- function(row) {
     ))
   }
 
-  # Both significant - check for reversal if possible
-  # Direction is assessable if we have a directional ES type and both effect sizes
-  direction_assessable <- !is.na(es_type_o) &&
-                          tolower(es_type_o) %in% tolower(DIRECTIONAL_ES_TYPES) &&
-                          !is.na(es_o) && !is.na(es_r)
+  # Both significant - check for reversal if direction is assessable
+  es_o <- safe_as_numeric(row$es_o)
+  es_r <- safe_as_numeric(row$es_r)
+  direction_assessable <- isTRUE(is_direction_assessable(row$es_type_o, row$es_type_r, es_o, es_r))
 
   if (direction_assessable) {
     # Check if signs differ (reversal)
@@ -202,12 +306,16 @@ studies <- df %>%
       as.numeric(stringr::str_extract(ref_o, "\\b(19|20)\\d{2}\\b")),
       as.numeric(orig_year)
     ),
-    # Extract journal from reference (text before year in parentheses)
-    orig_journal = stringr::str_extract(ref_o, "(?<=\\. )[^.]+(?=,? \\d{4})"),
+    # Preserve journal from FReD (populated from journal_o); only fall back to regex if missing
+    orig_journal_calc = if_else(
+      !is.na(orig_journal) & trimws(as.character(orig_journal)) != "",
+      gsub("&amp;", "&", trimws(as.character(orig_journal)), fixed = TRUE),
+      stringr::str_extract(ref_o, "(?<=\\. )[^.]+(?=,? \\d{4})")
+    ),
+    pval_value_o_num = safe_as_numeric(pval_value_o),
+    pval_value_r_num = safe_as_numeric(pval_value_r),
     # Determine if direction is assessable for this entry
-    direction_assessable = !is.na(es_type_o) &
-                           tolower(es_type_o) %in% tolower(DIRECTIONAL_ES_TYPES) &
-                           !is.na(es_o) & !is.na(es_r)
+    direction_assessable = is_direction_assessable(es_type_o, es_type_r, es_o, es_r)
   ) %>%
   transmute(
     id,
@@ -230,14 +338,14 @@ studies <- df %>%
     ci_upper_r = ci.upper_r,
     p_o = p_value_o,
     p_r = p_value_r,
-    pval_value_o,
+    pval_value_o = pval_value_o_num,
     pval_type_o,
-    pval_value_r,
+    pval_value_r = pval_value_r_num,
     pval_type_r,
     power_r,
     source = NA_character_,  # No dedicated source project field in current data
     orig_year = orig_year_calc,
-    orig_journal,
+    orig_journal = orig_journal_calc,
     discipline,
     validated = !is.na(contributors),  # Validated if has contributors
     tags,
@@ -274,7 +382,7 @@ success_criteria_meta <- list(
     label = "Significance of Replication",
     shortLabel = "Significance (Rep)",
     hasOSNotSignificant = TRUE,
-    note = "Replication success was assessed based on the statistical significance of the replication effect (using reported p-values) and whether its direction is consistent with the original effect. Replications that were significant and in the same direction as the original were considered as successes, while replications that were not significant or in the opposite direction were considered as failures.",
+    note = "Replication success was assessed based on the statistical significance of the replication effect (using reported p-values, falling back to effect-size-derived p-values when unavailable or indeterminate) and whether its direction is consistent with the original effect. Replications that were significant and in the same direction as the original were considered as successes, while replications that were not significant or in the opposite direction were considered as failures.",
     hasDynamicReversalNote = TRUE
   ),
   significance_agg = list(
@@ -321,7 +429,7 @@ success_criteria_meta <- list(
   )
 )
 
-# Outcome colors
+# Outcome colors (reserve "darkred" strictly for reversals / opposite-direction failures)
 outcome_colors <- list(
   success = "#8FBC8F",
   Success = "#8FBC8F",
@@ -333,8 +441,12 @@ outcome_colors <- list(
   `Not calculable` = "#C8C8C8",
   `not calculable` = "#C8C8C8",
   `success (homogeneous and jointly significantly above 0)` = "#8FBC8F",
+  `success (homogeneous and jointly significantly different from 0)` = "#8FBC8F",
   `failure (not homogeneous but jointly significantly above 0)` = "#efa986",
-  `failure (not homogeneous and not significant)` = "darkred",
+  `failure (not homogeneous but jointly significantly different from 0)` = "#efa986",
+  `failure (homogeneous but jointly significant in opposite direction)` = "darkred",
+  `failure (not homogeneous and jointly significant in opposite direction)` = "darkred",
+  `failure (not homogeneous and not significant)` = "#CD5C5C",
   `failure (homogeneous but not significant)` = "#FF7F7F"
 )
 
@@ -347,7 +459,7 @@ output <- list(
     sourceCount = length(sources) - 1  # Exclude "All studies"
   ),
   studies = studies,
-  sources = sources,
+  sources = I(sources),
   successCriteria = success_criteria_meta,
   outcomeColors = outcome_colors
 )
@@ -356,14 +468,14 @@ output <- list(
 output_file <- file.path(OUTPUT_DIR, "explorer-data.json")
 cat("Writing JSON to:", output_file, "\n")
 
-# Convert to JSON with proper formatting
+# Convert to JSON with proper formatting (I(6) = 6 significant digits so small p-values retain precision)
 json_output <- toJSON(
   output,
   auto_unbox = TRUE,
   na = "null",
   null = "null",
   pretty = FALSE,  # Compact for smaller file size
-  digits = 6
+  digits = I(6)
 )
 
 writeLines(json_output, output_file)

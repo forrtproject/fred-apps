@@ -194,14 +194,25 @@ FReD.dataLoader = {
         FReD.successCriteria.getOutcome(s, criterionId).outcome
       );
 
-      // Determine aggregate outcome
-      let aggregateOutcome;
-      const uniqueOutcomes = [...new Set(outcomes.filter(o => o !== 'Not calculable'))];
+      // Determine aggregate outcome (exclude non-calculable / non-coded entries case-insensitively)
+      const calculableOutcomes = outcomes.filter(o => {
+        if (!o) return false;
+        const lower = o.toLowerCase();
+        return lower !== 'not calculable' && lower !== 'not coded';
+      });
+      const uniqueByLower = new Map();
+      calculableOutcomes.forEach(o => {
+        const lower = o.toLowerCase();
+        if (!uniqueByLower.has(lower)) {
+          uniqueByLower.set(lower, o);
+        }
+      });
 
-      if (uniqueOutcomes.length === 0) {
+      let aggregateOutcome;
+      if (uniqueByLower.size === 0) {
         aggregateOutcome = 'Not calculable';
-      } else if (uniqueOutcomes.length === 1) {
-        aggregateOutcome = uniqueOutcomes[0];
+      } else if (uniqueByLower.size === 1) {
+        aggregateOutcome = uniqueByLower.values().next().value;
       } else {
         aggregateOutcome = 'mixed';
       }

@@ -112,6 +112,16 @@ FReD.explorer = {
     this._lastFocusedEl = null;
     if (prev && typeof prev.focus === 'function' && document.contains(prev) && prev.offsetParent !== null) {
       prev.focus();
+    } else if (prev) {
+      // Trigger is hidden (e.g. #about-link inside collapsed mobile #header-nav): return focus to menu toggle if visible
+      const menuBtn = document.getElementById('topbar-menu-btn');
+      if (menuBtn && menuBtn.offsetParent !== null) {
+        menuBtn.focus();
+      } else if (document.activeElement && modalEl.contains(document.activeElement)) {
+        document.body.setAttribute('tabindex', '-1');
+        document.body.focus({ preventScroll: true });
+        document.body.removeAttribute('tabindex');
+      }
     } else if (document.activeElement && modalEl.contains(document.activeElement)) {
       // First-run modal without trigger: move sequential focus cursor to top of document so the next Tab reaches .skip-link first
       document.body.setAttribute('tabindex', '-1');
@@ -512,8 +522,8 @@ FReD.explorer = {
         }
       });
 
-      // Add click handler for expand/collapse (supports button & cell click + aria-expanded)
-      $('#studies-table tbody').on('click', 'td.dt-control', function() {
+      // Add click handler for expand/collapse (unbind first to prevent duplicates on rebuildTable)
+      $('#studies-table tbody').off('click', 'td.dt-control').on('click', 'td.dt-control', function() {
         const tr = $(this).closest('tr');
         const row = self.dataTable.row(tr);
         const btn = $(this).find('.dt-expand-btn')[0];
@@ -828,33 +838,65 @@ FReD.explorer = {
   },
 
   /**
+   * Parse coded p-value operator string (e.g., 'l (<)', 'le (<=)', 'g (>)', 'ge (>=)',
+   * 'ge (>)', 'e (=)', '"<"', '"="', '<', '>', 'l', 'g', 'le', 'ge', 'e') into display symbol.
+   */
+  parsePValueOperator(type) {
+    if (type == null) return '=';
+    const pt = String(type).trim().toLowerCase();
+    if (!pt) return '=';
+
+    // Check explicit symbolic operators first so strings like "ge (>=)", "ge (>)",
+    // "le (<=)", '"<"', and '"="' map unambiguously before matching letter codes.
+    if (pt.includes('>=')) return '≥';
+    if (pt.includes('<=')) return '≤';
+    if (pt.includes('>')) return '>';
+    if (pt.includes('<')) return '<';
+
+    // Fallback to letter codes when no symbolic operator is present
+    if (/\bge\b/.test(pt)) return '≥';
+    if (/\ble\b/.test(pt)) return '≤';
+    if (/\bg\b/.test(pt)) return '>';
+    if (/\bl\b/.test(pt)) return '<';
+    if (pt.includes('=') || /\be\b/.test(pt)) return '=';
+
+    return '=';
+  },
+
+  /**
    * Format coded p-value for display
    * Rules:
-   * - p < X: show only up to last non-zero digit (e.g., .05 not .0500)
-   * - p = X: show minimum 3 decimals, drop trailing zeros after 3 (e.g., .050 not .05000, but keep .05001)
-   * - p > X: same as p <
+   * - Zero with '=', '<', or '≤' (e.g., SPSS .000 or underflowed computed p): display as "p < 0.001"
+   * - Very small positive values (0 < p < 0.0001): compact scientific notation (e.g., 4.02e-22, 1e-5)
+   * - p < X, p ≤ X, p > X, p ≥ X: show only up to last non-zero digit (e.g., 0.05 not 0.0500)
+   * - p = X: show minimum 3 decimals, drop trailing zeros after 3 (e.g., 0.050 not 0.05000, keep 0.05001)
    */
   formatCodedPValue(value, type) {
     if (value == null || value === '') return 'N/A';
 
     // Convert to number in case it's a string from JSON
     const numValue = Number(value);
-    if (isNaN(numValue)) return 'N/A';
+    if (!Number.isFinite(numValue)) return 'N/A';
 
-    const symbol = (type === 'l' || type === '<') ? '<' :
-                   (type === 'g' || type === '>') ? '>' : '=';
+    const symbol = this.parsePValueOperator(type);
+
+    if (numValue === 0 && (symbol === '=' || symbol === '<' || symbol === '≤')) {
+      return 'p < 0.001';
+    }
 
     let formatted;
-    if (symbol === '=') {
+    if (numValue > 0 && numValue < 1e-4) {
+      // Preserve precision for tiny / scientific-notation p-values (e.g. 4.02E-22)
+      const [mantissa, exponent] = numValue.toExponential(2).split('e');
+      const cleanMantissa = mantissa.replace(/\.?0+$/, '');
+      formatted = `${cleanMantissa}e${exponent}`;
+    } else if (symbol === '=') {
       // For p = X: minimum 3 decimals, drop trailing zeros after position 3
-      // Format to enough precision first
       const fullStr = numValue.toFixed(6);
-      // Find the decimal point position
       const decimalPos = fullStr.indexOf('.');
       if (decimalPos === -1) {
         formatted = numValue.toFixed(3);
       } else {
-        // Check if there are significant digits beyond position 3
         const fullDecimals = fullStr.slice(decimalPos + 1);
         let lastSignificant = 2; // minimum 3 decimals (index 2)
         for (let i = fullDecimals.length - 1; i >= 3; i--) {
@@ -866,17 +908,41 @@ FReD.explorer = {
         formatted = numValue.toFixed(lastSignificant + 1);
       }
     } else {
-      // For p < or p >: show only up to last non-zero digit
+      // For p <, p ≤, p >, p ≥: show only up to last non-zero digit
       const fullStr = numValue.toFixed(6);
-      // Remove trailing zeros
       formatted = parseFloat(fullStr).toString();
-      // Ensure at least some decimal representation for small values
-      if (!formatted.includes('.') && numValue < 1) {
-        formatted = numValue.toFixed(2);
-      }
     }
 
     return `p ${symbol} ${formatted}`;
+  },
+
+  /**
+   * Check whether a coded p-value is indeterminate at alpha = 0.05
+   * (e.g., p < 0.10, p <= 0.72, or p > 0.01)
+   */
+  isCodedPValueIndeterminate(value, type, alpha = 0.05) {
+    if (value == null || value === '') return true;
+    const numValue = Number(value);
+    if (!Number.isFinite(numValue)) return true;
+    const symbol = this.parsePValueOperator(type);
+    if ((symbol === '<' || symbol === '≤') && numValue > alpha) return true;
+    if ((symbol === '>' || symbol === '≥') && numValue < alpha) return true;
+    return false;
+  },
+
+  /**
+   * Format study p-value with fallback to ES-derived p-value when coded p-value is absent or indeterminate
+   */
+  formatStudyPValue(codedValue, codedType, computedValue) {
+    const coded = this.formatCodedPValue(codedValue, codedType);
+    const computed = this.formatCodedPValue(computedValue, '=');
+    if (coded === 'N/A') {
+      return computed !== 'N/A' ? `${computed} (computed)` : 'N/A';
+    }
+    if (computed !== 'N/A' && this.isCodedPValueIndeterminate(codedValue, codedType)) {
+      return `${coded} (computed: ${computed})`;
+    }
+    return coded;
   },
 
   /**
@@ -999,8 +1065,8 @@ FReD.explorer = {
           <div>
             <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Statistics</h5>
             <table style="font-size: 0.875rem;">
-              <tr><td style="padding-right: 1rem;"><strong>Original p-value:</strong></td><td>${this.formatCodedPValue(study.pval_value_o, study.pval_type_o)}</td></tr>
-              <tr><td><strong>Replication p-value:</strong></td><td>${this.formatCodedPValue(study.pval_value_r, study.pval_type_r)}</td></tr>
+              <tr><td style="padding-right: 1rem;"><strong>Original p-value:</strong></td><td>${this.formatStudyPValue(study.pval_value_o, study.pval_type_o, study.p_o)}</td></tr>
+              <tr><td><strong>Replication p-value:</strong></td><td>${this.formatStudyPValue(study.pval_value_r, study.pval_type_r, study.p_r)}</td></tr>
               <tr><td><strong>Power:</strong></td><td>${FReD.utils.formatNumber(study.power_r, 2) || 'N/A'}</td></tr>
               <tr><td><strong>Outcome (${FReD.utils.escapeHtml(criterionLabel)}):</strong></td><td>${FReD.utils.capFirstLetter(outcomeReport || 'Not calculable')}</td></tr>
             </table>
@@ -1135,7 +1201,7 @@ FReD.explorer = {
       if (link) {
         html += `<a href="${FReD.utils.escapeHtml(link)}" target="_blank" rel="noopener" class="tooltip-btn tooltip-link" title="Open paper">${LINK_SVG}Open</a>`;
       }
-      html += `<span class="sr-only tooltip-live" role="status" aria-live="polite"></span>`;
+      html += `<span class="visually-hidden tooltip-live" role="status" aria-live="polite"></span>`;
       html += `</div>`;
 
       tooltip.innerHTML = html;

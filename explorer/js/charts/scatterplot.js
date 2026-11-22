@@ -115,15 +115,20 @@ FReD.charts.scatterplot = {
     const bottomRugY = Number((tickMinY - 0.05).toFixed(2));
     const leftRugX = Number((tickMinX - 0.05).toFixed(2));
 
+    // Define order for legend (exact case-insensitive matching across all criteria)
     const outcomeOrder = [
       'Success', 'Successful', 'Successful replication',
       'Success (homogeneous and jointly significantly above 0)',
+      'Success (homogeneous and jointly significantly different from 0)',
       'Statistically successful but flawed',
       'Failure (not homogeneous but jointly significantly above 0)',
+      'Failure (not homogeneous but jointly significantly different from 0)',
       'Failure', 'Failed', 'Failed replication', 'Informative failure',
-      'Failure (reversal)',
       'Failure (homogeneous but not significant)',
       'Failure (not homogeneous and not significant)',
+      'Failure (reversal)',
+      'Failure (homogeneous but jointly significant in opposite direction)',
+      'Failure (not homogeneous and jointly significant in opposite direction)',
       'Mixed',
       'OS not significant', 'Uninformative', 'Descriptive only',
       'Not calculable', 'Not coded'
