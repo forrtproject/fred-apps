@@ -33,16 +33,13 @@ jobs:
     permissions:
       contents: write
 
-  deploy:
+  build:
     needs: [refresh]
     # Proceed even if refresh was skipped or failed, so production always builds
     # from the latest verified Release bundle (or retries a previously failed deploy).
     if: always() && (needs.refresh.result == 'success' || needs.refresh.result == 'skipped' || needs.refresh.result == 'failure')
     runs-on: ubuntu-24.04
     timeout-minutes: 15
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -68,6 +65,14 @@ jobs:
         with:
           path: _site
 
+  deploy:
+    needs: [build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
