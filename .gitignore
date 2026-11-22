@@ -19,5 +19,7 @@ node_modules/
 # Local testing
 *.local
 
-# Large data files (only keep compressed versions)
-data/retraction-watch.csv
+# Generated static data (stored in the `data-latest` GitHub Release, not git)
+/data/
+/_site/
+/_work/

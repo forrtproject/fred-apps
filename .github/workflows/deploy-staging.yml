@@ -1,0 +1,38 @@
+name: Deploy to staging
+
+# Publishes this repository's static apps to https://staging.forrt.org/fred-apps/
+# (FReD Explorer at https://staging.forrt.org/fred-apps/explorer/) through the
+# shared FORRT workflow (forrtproject/.github).
+#
+# Staging intentionally omits `data/` so large binary datasets are never copied
+# into `forrtproject/webpage-staging` git history; on staging.forrt.org,
+# `shared/js/data-loader.js` reads the CORS-enabled production data at
+# https://forrt.org/fred-apps/data/.
+on:
+  push:
+    branches: ['staging', 'staging/**']
+    tags: ['staging**']
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Branch, tag or commit to deploy (empty = the branch selected above)'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    uses: forrtproject/.github/.github/workflows/deploy-staging.yml@main
+    with:
+      ref: ${{ inputs.ref }}
+      site-dir: _site
+      build: |
+        rm -rf _site
+        mkdir -p _site
+        cp index.html _site/
+        cp -r explorer annotator shared _site/
+    secrets:
+      STAGING_GITHUB_TOKEN: ${{ secrets.STAGING_GITHUB_TOKEN }}

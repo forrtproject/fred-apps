@@ -1,0 +1,73 @@
+name: Deploy FReD Apps to GitHub Pages
+
+# Builds and publishes https://forrt.org/fred-apps/ via GitHub Actions Pages.
+# Data files live in the `data-latest` GitHub Release (never tracked in git)
+# and are hydrated into `_site/data/` on every build.
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Daily data refresh & publish at 02:00 UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      refresh_data:
+        description: 'Refresh upstream data into data-latest before deploying'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && inputs.refresh_data == true)
+    uses: ./.github/workflows/update-data.yml
+    permissions:
+      contents: write
+
+  deploy:
+    needs: [refresh]
+    # Proceed even if refresh was skipped or failed, so production always builds
+    # from the latest verified Release bundle (or retries a previously failed deploy).
+    if: always() && (needs.refresh.result == 'success' || needs.refresh.result == 'skipped' || needs.refresh.result == 'failure')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Assemble static site
+        run: |
+          mkdir -p _site/data
+          cp index.html _site/
+          cp -r explorer annotator shared _site/
+
+      - name: Hydrate latest verified data bundle
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bash scripts/fetch-data.sh _site/data
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

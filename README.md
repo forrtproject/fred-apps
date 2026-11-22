@@ -89,7 +89,12 @@ FReD-apps/
 
 ### Quick Start
 
-Start a local HTTP server to test the apps. Any static server will work:
+1. Fetch the latest validated data bundle from the `data-latest` GitHub Release (no GitHub login required):
+```bash
+bash scripts/fetch-data.sh data
+```
+
+2. Start a local HTTP server to test the apps. Any static server will work:
 
 **Python:**
 ```bash
@@ -116,14 +121,12 @@ These apps cannot be run by opening HTML files directly (`file://` protocol) bec
 
 ## Data Updates
 
-Data is automatically updated weekly via GitHub Actions:
+Processed datasets (`explorer-data.json`, `flora-data.json`, `retraction-watch.csv.gz`) are stored as versioned archive assets on the `data-latest` GitHub Release rather than committed to git history:
 
-1. The `update-data.yml` workflow runs every Sunday at 2:00 AM UTC
-2. R preprocessing scripts fetch the latest data from the FReD package
-3. JSON files in `data/` are regenerated and committed if changes are detected
-4. GitHub Pages automatically redeploys from the main branch
-
-To manually trigger a data update, use the "Run workflow" button in the GitHub Actions tab.
+1. `.github/workflows/deploy.yml` runs daily at 2:00 AM UTC (and on `main` pushes or manual dispatch).
+2. On scheduled runs (or when `refresh_data=true`), `.github/workflows/update-data.yml` regenerates the Explorer & FLoRA JSONs and downloads Retraction Watch independently, validates each file against the previous baseline, and uploads a new verified `fred-data-*.tar.gz` bundle to `data-latest` only when content changed (retaining the 2 newest verified bundles for rollback).
+3. The Pages deploy job hydrates `_site/data/` from `data-latest` via `scripts/fetch-data.sh` and publishes via `actions/deploy-pages`.
+4. Staging (`staging.forrt.org/fred-apps/`) omits `data/` from `webpage-staging` and fetches the CORS-enabled production datasets at `https://forrt.org/fred-apps/data/`.
 
 ## Related Resources
 
