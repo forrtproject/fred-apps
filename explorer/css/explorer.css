@@ -544,8 +544,65 @@ table.dataTable tbody .study-details table tr:hover > * {
   color: var(--text-muted);
 }
 
+/* Correlates Totals / Shares (%) toggle bar */
+.correlates-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  margin-bottom: 0.9rem;
+  flex-wrap: wrap;
+}
+
+.correlates-toolbar[hidden] {
+  display: none;
+}
+
+.correlates-toolbar-label {
+  font-size: var(--fs-2);
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.segmented-toggle {
+  display: inline-flex;
+  background: var(--surface-alt);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px;
+  gap: 2px;
+}
+
+.segmented-toggle-btn {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: var(--font-body);
+  font-size: var(--fs-3);
+  font-weight: 600;
+  min-height: 32px;
+  padding: 0.4rem 0.85rem;
+  border-radius: calc(var(--radius) - 2px);
+  cursor: pointer;
+  transition: background var(--transition), color var(--transition);
+}
+
+.segmented-toggle-btn:hover {
+  color: var(--text-primary);
+}
+
+.segmented-toggle-btn.active {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+
 /* Print-specific */
 @media print {
+  .correlates-toolbar {
+    display: none;
+  }
+
   .page-header {
     border-bottom: 2px solid var(--print-fg);
   }

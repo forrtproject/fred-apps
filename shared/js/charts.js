@@ -100,24 +100,33 @@ FReD.charts = FReD.charts || {};
   }
 
   function csvText(headers, rows, notes) {
-    const cell = function (v) {
+    const outHeaders = notes ? ['Export context'].concat(headers) : headers;
+    const cell = function (v, colIdx) {
       let s;
       if (typeof v === 'number' && isFinite(v)) {
+        const h = outHeaders[colIdx] || '';
         // Preserve full precision for very small nonzero values (e.g. p-values)
-        s = (v !== 0 && Math.abs(v) < 1e-4) ? String(v) : String(Number(v.toFixed(5)));
+        if (v !== 0 && Math.abs(v) < 1e-4) {
+          s = String(v);
+        } else if (/percentage|%/i.test(h)) {
+          s = v.toFixed(1);
+        } else {
+          s = String(Number(v.toFixed(5)));
+        }
       } else {
-        s = (Array.isArray(v) ? plain(v) : String(v ?? '')).replace(/^[=+@-]/, function (m) {
+        s = (Array.isArray(v) ? plain(v) : String(v ?? '')).replace(/^[=+\-@\t\r]/, function (m) {
           return "'" + m;
         });
       }
       return '"' + s.replace(/"/g, '""') + '"';
     };
-    const outHeaders = notes ? ['Export context'].concat(headers) : headers;
     const outRows = rows.map(function (row) {
       return notes ? [notes].concat(row) : row;
     });
-    return [outHeaders].concat(outRows).map(function (row) {
-      return row.map(cell).join(',');
+    return [outHeaders].concat(outRows).map(function (row, rIdx) {
+      return row.map(function (v, cIdx) {
+        return rIdx === 0 ? cell(v, -1) : cell(v, cIdx);
+      }).join(',');
     }).join('\r\n');
   }
 
