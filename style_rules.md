@@ -52,9 +52,9 @@ There are two distinct outcome palettes:
 |---|---|---|---|
 | `--color-chart-successful` | `#248073` | `#7ad9b5` | success, successful, successful replication, homogeneous & jointly significant |
 | `--color-chart-failed` | `#c24a33` | `#f08570` | failure, failed, failed replication, informative failure, homogeneous & not significant |
-| `--color-chart-technical-failure` | `#7a2a23` | `#d9645a` | failure (reversal), not homogeneous & not significant |
-| `--color-chart-failure-partial` | `#d0684b` | `#f4a582` | failure (not homogeneous but jointly significantly above 0) |
-| `--color-chart-mixed` | `#d9a441` | `#e3b657` | mixed |
+| `--color-chart-technical-failure` | `#7a2a23` | `#e04f5f` | failure (reversal), not homogeneous & not significant |
+| `--color-chart-failure-partial` | `#d96b27` | `#f4a582` | failure (not homogeneous but jointly significantly above 0) |
+| `--color-chart-mixed` | `#b8841f` | `#e3b657` | mixed |
 | `--color-chart-qualified` | `#7b61a8` | `#c0a8fa` | statistically successful but flawed |
 | `--color-chart-descriptive` | `#5d7186` | `#7a92a8` | descriptive only |
 | `--color-chart-uninformative` | `#a3907a` | `#c2b29c` | OS not significant, uninformative |
