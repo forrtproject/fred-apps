@@ -98,8 +98,13 @@
           <!-- Minimum Power -->
           <div class="form-group">
             <label class="form-label" for="minpower">Minimum Power</label>
-            <input type="range" id="minpower" class="form-range" min="0.05" max="0.999" step="0.01" value="0.05" aria-valuetext="5%">
+            <input type="range" id="minpower" class="form-range" min="0.05" max="0.99" step="0.01" value="0.05" aria-valuetext="5%">
             <div class="range-value" id="minpower-value">5%</div>
+            <label class="power-missing-toggle" for="keep-missing-power">
+              <input type="checkbox" id="keep-missing-power" checked>
+              <span>Keep studies with missing power</span>
+            </label>
+            <div class="power-filter-note" id="power-filter-note" aria-live="polite"></div>
           </div>
 
           <!-- Success Criterion - now a dropdown -->
@@ -166,7 +171,10 @@
           <!-- Scatterplot -->
           <div class="card">
             <div class="card-header chart-card-header">
-              <span>Effect Size Comparison</span>
+              <div class="chart-card-title">
+                <span>Effect Size Comparison</span>
+                <span id="scatterplot-count" class="chart-card-meta"></span>
+              </div>
               <div class="chart-card-actions" id="scatterplot-actions"></div>
             </div>
             <div class="card-body">
@@ -337,7 +345,7 @@
           analyze replication studies across psychology and related fields.
         </p>
         <p>
-          Use the filters on the left to narrow down studies.
+          Use the filters to narrow down studies.
           Select different success criteria to see how outcomes vary based on
           different definitions of replication success.
         </p>

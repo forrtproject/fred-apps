@@ -272,12 +272,14 @@ FReD.explorer = {
     this.filteredStudies = FReD.filters.applyFilters(this.allStudies, {
       source: state.source,
       minPower: state.minPower,
+      keepMissingPower: state.keepMissingPower,
       search: state.search
     });
 
-    // Update count displays
+    // Update count displays & power breakdown note
     FReD.filters.updateStudyCount(this.filteredStudies.length, this.allStudies.length);
     FReD.filters.updateReplicationCount(this.filteredStudies, this.allStudies);
+    FReD.filters.updatePowerNote(this.allStudies, state);
 
     // Update success note (depends on filtered studies)
     this.updateSuccessNote(state.criterion);
@@ -769,14 +771,25 @@ FReD.explorer = {
   },
 
   /**
-   * Handle column visibility toggle
+   * Handle column visibility toggle (preserves selector order and keeps >= 1 visible column)
    */
   handleColumnToggle(columnKey, isVisible) {
-    if (isVisible && !this.visibleColumns.includes(columnKey)) {
-      this.visibleColumns.push(columnKey);
-    } else if (!isVisible) {
-      this.visibleColumns = this.visibleColumns.filter(k => k !== columnKey);
+    const visibleSet = new Set(this.visibleColumns);
+    if (isVisible) {
+      visibleSet.add(columnKey);
+    } else {
+      if (visibleSet.size <= 1 && visibleSet.has(columnKey)) {
+        const cb = document.getElementById(`col-${columnKey}`);
+        if (cb) cb.checked = true;
+        FReD.utils.showNotification('At least one column must remain visible.', 'info', 2500);
+        return;
+      }
+      visibleSet.delete(columnKey);
     }
+
+    // Keep columns in the selector's canonical order (includes newly added columns not yet in saved order)
+    const order = FReD.columnConfig.getSelectableColumns().map(c => c.key);
+    this.visibleColumns = order.filter(k => visibleSet.has(k));
 
     // Save preference
     FReD.columnConfig.saveVisibleColumns(this.visibleColumns);

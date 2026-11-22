@@ -106,12 +106,21 @@ FReD.charts.forestplot = {
    * Apply current sorting to studies before pagination
    */
   applySorting() {
+    const compareNullableDesc = (aVal, bVal) => {
+      const aValid = aVal != null && !isNaN(aVal);
+      const bValid = bVal != null && !isNaN(bVal);
+      if (!aValid && !bValid) return 0;
+      if (!aValid) return 1;
+      if (!bValid) return -1;
+      return bVal - aVal;
+    };
+
     switch (this.sortBy) {
       case 'original':
-        this.allValidStudies.sort((a, b) => (b.es_o || 0) - (a.es_o || 0));
+        this.allValidStudies.sort((a, b) => compareNullableDesc(a.es_o, b.es_o));
         break;
       case 'replication':
-        this.allValidStudies.sort((a, b) => (b.es_r || 0) - (a.es_r || 0));
+        this.allValidStudies.sort((a, b) => compareNullableDesc(a.es_r, b.es_r));
         break;
       case 'alphabetical':
       default:
@@ -152,11 +161,16 @@ FReD.charts.forestplot = {
       .map(size => `<option value="${size}" ${size === this.pageSize ? 'selected' : ''}>${size}</option>`)
       .join('');
 
+    const totalSelected = Array.isArray(this.lastStudies) ? this.lastStudies.length : totalEffects;
+    const coverageSuffix = totalSelected > totalEffects
+      ? ` with effect sizes (of ${totalSelected.toLocaleString()} selected)`
+      : '';
+
     const controlsHtml = `
       <div class="forest-controls">
         <div class="forest-controls-left">
           <span class="text-muted">
-            Showing ${startIdx + 1}-${endIdx} of ${totalEffects} effects
+            Showing ${startIdx + 1}-${endIdx} of ${totalEffects.toLocaleString()} effects${coverageSuffix}
           </span>
           <div class="forest-control-group">
             <label for="forest-page-size" class="forest-control-label">Per page:</label>
@@ -263,11 +277,16 @@ FReD.charts.forestplot = {
   renderPlot(validStudies, totalCount, refocusId) {
     this._unmountActive();
 
+    const totalSelected = Array.isArray(this.lastStudies) ? this.lastStudies.length : validStudies.length;
+    const coverageSuffix = totalSelected > validStudies.length
+      ? ` with effect sizes (of ${totalSelected.toLocaleString()} selected)`
+      : '';
+
     const controlsHtml = `
       <div class="forest-controls">
         <div class="forest-controls-left">
           <span class="text-muted">
-            ${validStudies.length} ${validStudies.length === 1 ? 'effect' : 'effects'}
+            ${validStudies.length.toLocaleString()} ${validStudies.length === 1 ? 'effect' : 'effects'}${coverageSuffix}
           </span>
           <div class="forest-control-group">
             <label for="forest-sort-simple" class="forest-control-label">Sort:</label>

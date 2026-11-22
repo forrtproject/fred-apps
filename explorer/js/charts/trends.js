@@ -217,14 +217,17 @@ FReD.charts.trends = {
     });
 
     const MIN_COUNT = 10;
+    const MAX_UNCOLLAPSED = 12;
     const disciplineTotals = Object.entries(disciplineOutcomes).map(([discipline, outcomes]) => ({
       discipline,
       total: Object.values(outcomes).reduce((a, b) => a + b, 0),
       outcomes
     }));
 
-    const largeDisciplines = disciplineTotals.filter(d => d.total >= MIN_COUNT);
-    const smallDisciplines = disciplineTotals.filter(d => d.total < MIN_COUNT);
+    const largeOnly = disciplineTotals.filter(d => d.total >= MIN_COUNT);
+    const shouldCollapse = disciplineTotals.length > MAX_UNCOLLAPSED && largeOnly.length > 0;
+    const largeDisciplines = shouldCollapse ? [...largeOnly] : [...disciplineTotals];
+    const smallDisciplines = shouldCollapse ? disciplineTotals.filter(d => d.total < MIN_COUNT) : [];
 
     if (smallDisciplines.length > 0) {
       const otherOutcomes = {};
@@ -274,7 +277,8 @@ FReD.charts.trends = {
         ...outcomes.map(o => d.outcomes[o] || 0),
         d.total
       ]),
-      summary: `Aggregated replication outcomes by discipline across ${withDiscipline.length.toLocaleString('en-GB')} original studies (${criterionLabel}). Disciplines with fewer than ${MIN_COUNT} original studies are grouped into Other.`
+      summary: `Aggregated replication outcomes by discipline across ${withDiscipline.length.toLocaleString('en-GB')} original studies (${criterionLabel}).` +
+        (smallDisciplines.length > 0 ? ` Disciplines with fewer than ${MIN_COUNT} original studies are grouped into Other.` : '')
     };
 
     const optionFn = ({ width }) => {
@@ -353,11 +357,25 @@ FReD.charts.trends = {
   },
 
   /**
-   * Capitalize discipline name properly
+   * Capitalize discipline name properly (keeping minor conjunctions/prepositions lowercase)
    */
   capitalizeDiscipline(name) {
     if (!name) return 'Unknown';
-    return name.replace(/\b\w/g, c => c.toUpperCase());
+    const minorWords = new Set(['and', 'of', 'in', 'for', 'the', 'to', 'on', 'or']);
+    return name
+      .trim()
+      .split(/\s+/)
+      .map((word, idx) =>
+        word
+          .split('/')
+          .map((part, pIdx) => {
+            const lower = part.toLowerCase();
+            if (idx > 0 && pIdx === 0 && minorWords.has(lower)) return lower;
+            return lower ? lower.charAt(0).toUpperCase() + lower.slice(1) : '';
+          })
+          .join('/')
+      )
+      .join(' ');
   },
 
   /**
