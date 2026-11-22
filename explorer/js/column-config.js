@@ -278,10 +278,11 @@ FReD.columnConfig = {
       }
     });
 
-    // Always add hidden idx column last
+    // Always add hidden idx column last (non-searchable so row indices don't pollute search)
     columns.push({
       title: 'idx',
-      visible: false
+      visible: false,
+      searchable: false
     });
 
     return columns;
@@ -302,5 +303,42 @@ FReD.columnConfig = {
 
     row.push(idx);  // Hidden idx column
     return row;
+  },
+
+  /**
+   * Extract plain-text value for a column (used by Copy / CSV exports)
+   */
+  getPlainValue(study, key, criterion) {
+    switch (key) {
+      case 'description': return study.description || '';
+      case 'tags': return study.tags || '';
+      case 'result': {
+        const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
+        return FReD.utils.capFirstLetter(outcomeReport || 'Not calculable');
+      }
+      case 'ref_o': return study.ref_o || '';
+      case 'ref_r': return study.ref_r || '';
+      case 'source': return study.source || '';
+      case 'discipline': return study.discipline || '';
+      case 'orig_year': return study.orig_year ?? '';
+      case 'orig_journal': return study.orig_journal || '';
+      case 'es_o': return study.es_o != null && !isNaN(study.es_o) ? study.es_o : '';
+      case 'es_r': return study.es_r != null && !isNaN(study.es_r) ? study.es_r : '';
+      case 'n_o': return study.n_o ?? '';
+      case 'n_r': return study.n_r ?? '';
+      case 'power_r': return study.power_r != null && !isNaN(study.power_r) ? study.power_r : '';
+      case 'ci_o':
+        return (study.ci_lower_o != null && study.ci_lower_o !== '' && Number.isFinite(Number(study.ci_lower_o)) &&
+                study.ci_upper_o != null && study.ci_upper_o !== '' && Number.isFinite(Number(study.ci_upper_o)))
+          ? `[${FReD.utils.formatNumber(study.ci_lower_o, 3)}, ${FReD.utils.formatNumber(study.ci_upper_o, 3)}]`
+          : '';
+      case 'ci_r':
+        return (study.ci_lower_r != null && study.ci_lower_r !== '' && Number.isFinite(Number(study.ci_lower_r)) &&
+                study.ci_upper_r != null && study.ci_upper_r !== '' && Number.isFinite(Number(study.ci_upper_r)))
+          ? `[${FReD.utils.formatNumber(study.ci_lower_r, 3)}, ${FReD.utils.formatNumber(study.ci_upper_r, 3)}]`
+          : '';
+      default:
+        return study[key] ?? '';
+    }
   }
 };
