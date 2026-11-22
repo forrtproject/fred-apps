@@ -317,10 +317,14 @@ table.dataTable tbody td {
 
 /* Table cell truncation */
 #studies-table td:nth-child(2),
-#full-data-table td:first-child {
+#full-data-table td.description-cell {
   max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#full-data-table td:first-child {
   white-space: nowrap;
 }
 

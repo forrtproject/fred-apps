@@ -307,7 +307,7 @@ FReD.explorer = {
       FReD.charts.trends.renderDecade(this.filteredStudies, criterion);
       FReD.charts.trends.renderDiscipline(this.filteredStudies, criterion);
     } else if (activeTab === 'data') {
-      this.updateFullDataTable();
+      this.updateFullDataTable(criterion);
     }
   },
 
@@ -464,7 +464,7 @@ FReD.explorer = {
       FReD.charts.trends.renderDecade(this.filteredStudies, criterion);
       FReD.charts.trends.renderDiscipline(this.filteredStudies, criterion);
     } else if (tabId === 'data') {
-      this.updateFullDataTable();
+      this.updateFullDataTable(criterion);
       requestAnimationFrame(() => {
         if (this.fullDataTable) this.fullDataTable.columns.adjust();
       });
@@ -939,6 +939,13 @@ FReD.explorer = {
    */
   formatStudyDetails(study, criterion) {
     const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
+    const criterionInfo = FReD.successCriteria.getCriterion(criterion);
+    const criterionLabel = criterionInfo ? criterionInfo.label : criterion;
+
+    const formatCI = (lo, hi) => {
+      if (lo == null || hi == null || isNaN(lo) || isNaN(hi)) return 'N/A';
+      return `[${FReD.utils.formatNumber(lo, 3)}, ${FReD.utils.formatNumber(hi, 3)}]`;
+    };
 
     // Build replication reference with link
     const repRef = FReD.utils.escapeHtml(study.ref_r || 'N/A');
@@ -981,14 +988,14 @@ FReD.explorer = {
               <tr><td style="padding-right: 1rem;"><strong>Original p-value:</strong></td><td>${this.formatCodedPValue(study.pval_value_o, study.pval_type_o)}</td></tr>
               <tr><td><strong>Replication p-value:</strong></td><td>${this.formatCodedPValue(study.pval_value_r, study.pval_type_r)}</td></tr>
               <tr><td><strong>Power:</strong></td><td>${FReD.utils.formatNumber(study.power_r, 2) || 'N/A'}</td></tr>
-              <tr><td><strong>Outcome (${criterion}):</strong></td><td>${FReD.utils.capFirstLetter(outcomeReport || 'Not calculable')}</td></tr>
+              <tr><td><strong>Outcome (${FReD.utils.escapeHtml(criterionLabel)}):</strong></td><td>${FReD.utils.capFirstLetter(outcomeReport || 'Not calculable')}</td></tr>
             </table>
           </div>
           <div>
             <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Confidence Intervals</h5>
             <table style="font-size: 0.875rem;">
-              <tr><td style="padding-right: 1rem;"><strong>Original CI:</strong></td><td>[${FReD.utils.formatNumber(study.ci_lower_o, 3) || '?'}, ${FReD.utils.formatNumber(study.ci_upper_o, 3) || '?'}]</td></tr>
-              <tr><td><strong>Replication CI:</strong></td><td>[${FReD.utils.formatNumber(study.ci_lower_r, 3) || '?'}, ${FReD.utils.formatNumber(study.ci_upper_r, 3) || '?'}]</td></tr>
+              <tr><td style="padding-right: 1rem;"><strong>Original CI:</strong></td><td>${formatCI(study.ci_lower_o, study.ci_upper_o)}</td></tr>
+              <tr><td><strong>Replication CI:</strong></td><td>${formatCI(study.ci_lower_r, study.ci_upper_r)}</td></tr>
             </table>
             ${this.generateCIVisualization(study)}
           </div>
@@ -1005,17 +1012,26 @@ FReD.explorer = {
   /**
    * Update the full data table
    */
-  updateFullDataTable() {
-    const tableData = this.filteredStudies.map(study => [
-      FReD.utils.escapeHtml(study.description || ''),
-      FReD.utils.formatNumber(study.es_o, 3),
-      FReD.utils.formatNumber(study.es_r, 3),
-      study.n_o || '',
-      study.n_r || '',
-      FReD.utils.formatNumber(study.power_r, 2),
-      study.result || '',
-      FReD.utils.escapeHtml(study.source || '')
-    ]);
+  updateFullDataTable(criterionArg) {
+    const criterion = criterionArg || FReD.state.get('criterion');
+    const tableData = this.filteredStudies.map((study, idx) => {
+      const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
+      const discipline = study.discipline
+        ? FReD.charts.trends.capitalizeDiscipline(study.discipline)
+        : '';
+      return [
+        FReD.utils.formatReferenceCell(study.ref_o, study.doi_o),
+        FReD.utils.escapeHtml(study.description || ''),
+        FReD.utils.formatNumber(study.es_o, 3),
+        FReD.utils.formatNumber(study.es_r, 3),
+        study.n_o ?? '',
+        study.n_r ?? '',
+        FReD.utils.formatNumber(study.power_r, 2),
+        FReD.utils.escapeHtml(FReD.utils.capFirstLetter(outcomeReport || 'Not calculable')),
+        FReD.utils.escapeHtml(discipline),
+        idx
+      ];
+    });
 
     if (this.fullDataTable) {
       this.fullDataTable.clear();
@@ -1025,14 +1041,16 @@ FReD.explorer = {
       this.fullDataTable = $('#full-data-table').DataTable({
         data: tableData,
         columns: [
-          { title: 'Description' },
+          { title: 'Original Reference' },
+          { title: 'Description', className: 'description-cell' },
           { title: 'ES (Orig)' },
           { title: 'ES (Rep)' },
           { title: 'N (Orig)' },
           { title: 'N (Rep)' },
           { title: 'Power' },
           { title: 'Result' },
-          { title: 'Source' }
+          { title: 'Discipline' },
+          { title: 'idx', visible: false }
         ],
         pageLength: 25,
         order: [[0, 'asc']],
@@ -1048,26 +1066,22 @@ FReD.explorer = {
    * Setup export buttons
    */
   setupExportButtons() {
-    // Copy button
+    // Copy button (visible columns & active table search)
     document.getElementById('btn-copy')?.addEventListener('click', () => {
       const text = this.getTableText();
       FReD.utils.copyToClipboard(text);
     });
 
-    // CSV button
+    // CSV button (visible columns & active table search)
     document.getElementById('btn-csv')?.addEventListener('click', () => {
       const csv = this.getTableCSV();
       FReD.utils.downloadFile(csv, `fred-explorer-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
     });
 
-    // Excel button
-    document.getElementById('btn-excel')?.addEventListener('click', () => {
-      this.downloadExcel();
-    });
-
-    // Download button (full data)
+    // Download CSV button (full dataset tab, respects active table search)
     document.getElementById('btn-download')?.addEventListener('click', () => {
-      this.downloadExcel();
+      const csv = this.getFullDatasetCSV();
+      FReD.utils.downloadFile(csv, `fred-explorer-full-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
     });
   },
 
@@ -1257,68 +1271,96 @@ FReD.explorer = {
   },
 
   /**
-   * Get table data as text
+   * Return studies currently matching the active DataTables search/order,
+   * falling back to all filteredStudies when the table is not initialized.
+   */
+  _getActiveTableStudies(tableInstance) {
+    if (!tableInstance) return this.filteredStudies;
+    const rows = tableInstance.rows({ search: 'applied', order: 'applied' }).data().toArray();
+    return rows
+      .map(row => this.filteredStudies[row[row.length - 1]])
+      .filter(Boolean);
+  },
+
+  /**
+   * Format a single cell for CSV with RFC 4180 quoting and spreadsheet formula neutralization.
+   */
+  _formatCsvCell(val) {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'number') {
+      return isFinite(val) ? String(val) : '';
+    }
+    let str = String(val);
+    // Neutralize formula injection in non-numeric text cells
+    if (/^[=+\-@\t\r]/.test(str) && !/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(str.trim())) {
+      str = "'" + str;
+    }
+    if (/[",\r\n]/.test(str)) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  },
+
+  /**
+   * Get Effects table data as tab-separated text (respects visible column order & table search)
    */
   getTableText() {
     const criterion = FReD.state.get('criterion');
-    const headers = ['Description', 'Tags', 'Result', 'Original Reference', 'Replication Reference'];
-    const rows = this.filteredStudies.map(study => {
-      const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
-      return [
-        study.description || '',
-        study.tags || '',
-        outcomeReport || 'Not calculable',
-        study.ref_o || '',
-        study.ref_r || ''
-      ].join('\t');
-    });
+    const cols = this.visibleColumns.length > 0 ? this.visibleColumns : FReD.columnConfig.getVisibleColumns();
+    const headers = cols.map(k => FReD.columnConfig.COLUMN_DEFINITIONS[k]?.label || k);
+    const studies = this._getActiveTableStudies(this.dataTable);
+
+    const rows = studies.map(study =>
+      cols.map(k => String(FReD.columnConfig.getPlainValue(study, k, criterion) ?? '').replace(/[\t\r\n]+/g, ' ')).join('\t')
+    );
     return [headers.join('\t'), ...rows].join('\n');
   },
 
   /**
-   * Get table data as CSV
+   * Get Effects table data as CSV (respects visible column order & table search)
    */
   getTableCSV() {
     const criterion = FReD.state.get('criterion');
-    const data = this.filteredStudies.map(study => {
-      const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
-      return {
-        description: study.description || '',
-        tags: study.tags || '',
-        result: outcomeReport || 'Not calculable',
-        ref_o: study.ref_o || '',
-        ref_r: study.ref_r || '',
-        es_o: study.es_o,
-        es_r: study.es_r,
-        n_o: study.n_o,
-        n_r: study.n_r,
-        power: study.power_r,
-        source: study.source || ''
-      };
-    });
+    const cols = this.visibleColumns.length > 0 ? this.visibleColumns : FReD.columnConfig.getVisibleColumns();
+    const headers = cols.map(k => FReD.columnConfig.COLUMN_DEFINITIONS[k]?.label || k);
+    const studies = this._getActiveTableStudies(this.dataTable);
 
-    const headers = Object.keys(data[0] || {});
-    const rows = data.map(row =>
-      headers.map(h => {
-        let val = row[h];
-        if (val === null || val === undefined) val = '';
-        val = String(val);
-        if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-          val = '"' + val.replace(/"/g, '""') + '"';
-        }
-        return val;
-      }).join(',')
+    const headerLine = headers.map(h => this._formatCsvCell(h)).join(',');
+    const rows = studies.map(study =>
+      cols.map(k => this._formatCsvCell(FReD.columnConfig.getPlainValue(study, k, criterion))).join(',')
     );
-    return [headers.join(','), ...rows].join('\n');
+    return [headerLine, ...rows].join('\n');
   },
 
   /**
-   * Download data as Excel (using CSV for now, could use SheetJS for proper xlsx)
+   * Get full dataset export as CSV (respects sidebar filters & Data tab search)
    */
-  downloadExcel() {
-    const csv = this.getTableCSV();
-    FReD.utils.downloadFile(csv, `fred-explorer-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
-    FReD.utils.showNotification('Downloaded as CSV. For Excel format, open the CSV file in Excel.', 'info');
+  getFullDatasetCSV() {
+    const criterion = FReD.state.get('criterion');
+    const studies = this._getActiveTableStudies(this.fullDataTable);
+    const columns = [
+      { header: 'Original Reference', get: s => s.ref_o || '' },
+      { header: 'Replication Reference', get: s => s.ref_r || '' },
+      { header: 'Description', get: s => s.description || '' },
+      { header: 'Tags', get: s => s.tags || '' },
+      { header: 'Discipline', get: s => s.discipline ? FReD.charts.trends.capitalizeDiscipline(s.discipline) : '' },
+      { header: 'Original Year', get: s => s.orig_year ?? '' },
+      { header: 'Original Journal', get: s => s.orig_journal || '' },
+      { header: 'Result', get: s => FReD.utils.capFirstLetter(FReD.successCriteria.getOutcome(s, criterion).outcomeReport || 'Not calculable') },
+      { header: 'ES (Orig)', get: s => (s.es_o != null && !isNaN(s.es_o)) ? s.es_o : '' },
+      { header: 'ES (Rep)', get: s => (s.es_r != null && !isNaN(s.es_r)) ? s.es_r : '' },
+      { header: 'N (Orig)', get: s => s.n_o ?? '' },
+      { header: 'N (Rep)', get: s => s.n_r ?? '' },
+      { header: 'Power', get: s => (s.power_r != null && !isNaN(s.power_r)) ? s.power_r : '' },
+      { header: 'DOI (Orig)', get: s => s.doi_o || '' },
+      { header: 'DOI (Rep)', get: s => s.doi_r || '' }
+    ];
+
+    const headerLine = columns.map(c => this._formatCsvCell(c.header)).join(',');
+    const rows = studies.map(study =>
+      columns.map(c => this._formatCsvCell(c.get(study))).join(',')
+    );
+    return [headerLine, ...rows].join('\n');
   }
 };
 

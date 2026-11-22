@@ -184,9 +184,8 @@
               <div class="card-header-tools">
                 <div id="column-selector-container"></div>
                 <div class="btn-group">
-                  <button class="btn btn-sm btn-secondary" id="btn-copy">Copy</button>
-                  <button class="btn btn-sm btn-secondary" id="btn-csv">CSV</button>
-                  <button class="btn btn-sm btn-secondary" id="btn-excel">Excel</button>
+                  <button type="button" class="btn btn-sm btn-secondary" id="btn-copy">Copy</button>
+                  <button type="button" class="btn btn-sm btn-secondary" id="btn-csv">CSV</button>
                 </div>
               </div>
             </div>
@@ -243,12 +242,13 @@
           <div class="card">
             <div class="card-header">
               Full Dataset
-              <button class="btn btn-sm btn-primary" id="btn-download" style="float: right;">Download Excel</button>
+              <button type="button" class="btn btn-sm btn-primary" id="btn-download" style="float: right;">Download CSV</button>
             </div>
             <div class="card-body">
               <table id="full-data-table" class="display" style="width:100%">
                 <thead>
                   <tr>
+                    <th>Original Reference</th>
                     <th>Description</th>
                     <th>ES (Orig)</th>
                     <th>ES (Rep)</th>
@@ -256,7 +256,7 @@
                     <th>N (Rep)</th>
                     <th>Power</th>
                     <th>Result</th>
-                    <th>Source</th>
+                    <th>Discipline</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
