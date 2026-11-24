@@ -8,7 +8,11 @@ name: Deploy to staging
 # into `forrtproject/webpage-staging` git history; on staging.forrt.org,
 # `shared/js/data-loader.js` reads the CORS-enabled production data at
 # https://forrt.org/fred-apps/data/.
+# To deploy a PR to staging without creating a duplicate staging/* branch, add
+# the `staging` label to any same-repository PR.
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
   push:
     branches: ['staging', 'staging/**']
     tags: ['staging**']
@@ -25,9 +29,15 @@ permissions:
 
 jobs:
   deploy:
+    if: >-
+      github.event_name != 'pull_request' || (
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        contains(github.event.pull_request.labels.*.name, 'staging') &&
+        (github.event.action != 'labeled' || github.event.label.name == 'staging')
+      )
     uses: forrtproject/.github/.github/workflows/deploy-staging.yml@main
     with:
-      ref: ${{ inputs.ref }}
+      ref: ${{ inputs.ref || (github.event_name == 'pull_request' && github.event.pull_request.head.sha || '') }}
       site-dir: _site
       build: |
         rm -rf _site
