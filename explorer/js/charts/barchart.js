@@ -1,7 +1,8 @@
 /**
- * FReD Explorer - Bar Chart
+ * FReD Explorer - Bar Chart (Outcome Distribution)
  *
- * Creates a stacked bar chart showing outcome proportions
+ * One-row horizontal proportion bar rendered with Apache ECharts (SVG),
+ * following the flora-explorer shared chart setup.
  */
 
 window.FReD = window.FReD || {};
@@ -10,6 +11,7 @@ FReD.charts = FReD.charts || {};
 FReD.charts.barchart = {
   container: null,
   countSpan: null,
+  actionsEl: null,
   lastStudies: null,
   lastCriterion: null,
 
@@ -19,17 +21,10 @@ FReD.charts.barchart = {
   init(containerId) {
     this.container = document.getElementById(containerId);
     this.countSpan = document.getElementById('outcome-count');
+    this.actionsEl = document.getElementById(containerId + '-actions');
     if (!this.container) {
       console.error('Barchart container not found:', containerId);
-      return;
     }
-
-    // Listen for theme changes
-    window.addEventListener('themechange', () => {
-      if (this.lastStudies && this.lastCriterion) {
-        this.render(this.lastStudies, this.lastCriterion);
-      }
-    });
   },
 
   /**
@@ -38,24 +33,23 @@ FReD.charts.barchart = {
   render(studies, criterion) {
     if (!this.container) return;
 
-    // Store for re-rendering on theme change
     this.lastStudies = studies;
     this.lastCriterion = criterion;
 
     const total = studies.length;
-
-    // Update the count in the header
     if (this.countSpan) {
-      this.countSpan.textContent = `(${total} effects)`;
+      this.countSpan.textContent = `(${total.toLocaleString('en-GB')} effects)`;
     }
 
     if (total === 0) {
+      FReD.charts.unmount(this.container, this.actionsEl);
+      this.container.classList.add('is-empty');
+      this.container.style.height = '';
       this.container.innerHTML = '<div class="alert alert-info">No studies selected.</div>';
       return;
     }
 
-    // Get colors for current criterion
-    const colors = FReD.successCriteria.getColorsForCriterion(criterion);
+    this.container.classList.remove('is-empty');
 
     // Count outcomes
     const counts = {};
@@ -65,114 +59,134 @@ FReD.charts.barchart = {
       counts[outcome] = (counts[outcome] || 0) + 1;
     });
 
-    const outcomes = Object.keys(counts);
-
-    // Sort by a logical order
     const outcomeOrder = [
-      'Success', 'success',
+      'Success', 'Successful', 'Successful replication',
       'Success (homogeneous and jointly significantly above 0)',
       'Success (homogeneous and jointly significantly different from 0)',
+      'Statistically successful but flawed',
       'Failure (not homogeneous but jointly significantly above 0)',
       'Failure (not homogeneous but jointly significantly different from 0)',
-      'Failure', 'failure',
+      'Failure', 'Failed', 'Failed replication', 'Informative failure',
       'Failure (homogeneous but not significant)',
       'Failure (not homogeneous and not significant)',
-      'Failure (reversal)', 'failure (reversal)',
+      'Failure (reversal)',
       'Failure (homogeneous but jointly significant in opposite direction)',
       'Failure (not homogeneous and jointly significant in opposite direction)',
-      'OS not significant',
-      'Not calculable', 'not coded'
+      'Mixed',
+      'OS not significant', 'Uninformative', 'Descriptive only',
+      'Not calculable', 'Not coded'
     ];
 
-    outcomes.sort((a, b) => {
+    const outcomes = Object.keys(counts).sort((a, b) => {
       const aIdx = outcomeOrder.findIndex(o => a.toLowerCase() === o.toLowerCase());
       const bIdx = outcomeOrder.findIndex(o => b.toLowerCase() === o.toLowerCase());
       return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
     });
 
-    // Get theme-aware layout
-    const themeLayout = FReD.themeToggle ? FReD.themeToggle.getPlotlyLayout() : {};
-    const textColor = themeLayout.font?.color || '#333';
+    const criterionInfo = FReD.successCriteria.getCriterion(criterion);
+    const criterionLabel = criterionInfo ? criterionInfo.label : criterion;
 
-    // Create traces for stacked bar
-    const traces = outcomes.map(outcome => {
+    const rows = outcomes.map(outcome => {
       const count = counts[outcome];
-      const proportion = count / total;
-      const percentage = (proportion * 100).toFixed(1);
-
-      // Only show text label if segment is wide enough (>5% of total)
-      const showLabel = proportion >= 0.05;
-      // Shorten label for narrow segments (5-15%)
-      const labelText = proportion >= 0.15
-        ? `${outcome}: ${percentage}%`
-        : `${percentage}%`;
-
-      return {
-        x: [proportion],
-        y: [''],
-        type: 'bar',
-        orientation: 'h',
-        name: outcome,
-        text: showLabel ? [labelText] : [''],
-        textposition: 'inside',
-        insidetextanchor: 'middle',
-        textfont: {
-          color: '#fff',
-          size: 13
-        },
-        // Only show hover for segments without visible labels
-        hoverinfo: showLabel ? 'none' : 'text',
-        hovertext: [`${percentage}%`],
-        marker: {
-          color: colors[outcome] || colors[outcome.toLowerCase()] || '#C8C8C8'
-        }
-      };
+      const pct = Number(((100 * count) / total).toFixed(1));
+      return [outcome, count, pct];
     });
 
-    const layout = {
-      barmode: 'stack',
-      paper_bgcolor: 'transparent',
-      plot_bgcolor: 'transparent',
-      font: themeLayout.font || {},
-      xaxis: {
-        showticklabels: false,
-        showgrid: false,
-        zeroline: false,
-        range: [0, 1],
-        fixedrange: true
-      },
-      yaxis: {
-        fixedrange: true,
-        showticklabels: false,
-        showgrid: false,
-        zeroline: false
-      },
-      legend: {
-        orientation: 'h',
-        y: -0.4,
-        x: 0.5,
-        xanchor: 'center',
-        traceorder: 'normal',
-        bgcolor: 'transparent',
-        font: {
-          size: 12,
-          color: textColor
+    const table = {
+      headers: ['Outcome', 'Effects', 'Percentage (%)'],
+      rows: rows,
+      summary: `Outcome distribution across ${total.toLocaleString('en-GB')} selected effects (${criterionLabel}).`
+    };
+
+    const optionFn = ({ width }) => {
+      const t = FReD.charts.chartTheme();
+      const seriesValues = outcomes.map(outcome => [counts[outcome]]);
+      const corners = FReD.charts.stackCorners(seriesValues, true, 5);
+      const seriesColors = outcomes.map(outcome => FReD.successCriteria.getColor(outcome));
+
+      const series = outcomes.map((outcome, si) => {
+        const count = counts[outcome];
+        const proportion = count / total;
+        const pctText = FReD.charts.formatPercent(count, total, 1) + '%';
+        const color = seriesColors[si];
+
+        // Compute actual available pixel width in this bar segment so labels NEVER overflow or collide
+        const segPx = width * proportion;
+        const fullText = `${outcome}: ${pctText}`;
+        const fullNeededPx = fullText.length * 7.6 + 18;
+        const pctNeededPx = pctText.length * 7.8 + 14;
+        let labelText = '';
+        if (segPx >= fullNeededPx) {
+          labelText = fullText;
+        } else if (segPx >= pctNeededPx) {
+          labelText = pctText;
         }
+
+        return {
+          name: outcome,
+          type: 'bar',
+          stack: 'total',
+          barWidth: 22,
+          itemStyle: {
+            color: color,
+            borderColor: t.paper,
+            borderWidth: 1
+          },
+          emphasis: { focus: 'none' },
+          label: {
+            show: labelText.length > 0,
+            position: 'inside',
+            color: FReD.charts.labelColor(color),
+            fontSize: 12,
+            fontWeight: 600,
+            fontFamily: t.fontFamily,
+            formatter: () => labelText
+          },
+          data: [{
+            value: count,
+            itemStyle: { borderRadius: corners(si, 0) }
+          }]
+        };
+      });
+
+      const tooltip = {
+        trigger: 'axis',
+        axisPointer: { type: 'none' },
+        formatter: ps => {
+          const lines = [`<strong>Outcome Distribution</strong> \u00b7 N=${FReD.charts.formatNumber(total, 0)}`];
+          ps.forEach(p => {
+            const c = counts[p.seriesName] || 0;
+            if (c > 0) {
+              lines.push(FReD.charts.tipRow(
+                seriesColors[p.seriesIndex],
+                `${p.seriesName}: ${FReD.charts.formatNumber(c, 0)} (${FReD.charts.formatPercent(c, total, 1)}%)`
+              ));
+            }
+          });
+          return FReD.charts.tipLines(lines);
+        }
+      };
+
+      return FReD.charts.finishOption({
+        series: series,
+        tooltip: tooltip,
+        xAxis: { type: 'value', show: false, min: 0, max: Math.max(total, 1) },
+        yAxis: { type: 'category', show: false, data: ['Outcomes'] },
+        grid: { left: 0, right: 0, top: 6, bottom: 2, height: 28, containLabel: false }
+      }, { width });
+    };
+
+    FReD.charts.mount(this.container, {
+      title: `Outcome distribution (${criterionLabel})`,
+      option: optionFn,
+      heightFor: width => {
+        const scale = FReD.charts.textScale();
+        const rowsCount = FReD.charts.legendRows(outcomes, width, scale);
+        return Math.round(rowsCount * 24 * scale + 50);
       },
-      margin: { t: 5, r: 10, b: 35, l: 10 },
-      height: 80,
-      hoverlabel: {
-        bgcolor: '#333',
-        font: { color: '#fff', size: 12 }
-      }
-    };
-
-    const config = {
-      displayModeBar: false,
-      responsive: true
-    };
-
-    Plotly.newPlot(this.container, traces, layout, config);
+      table: table,
+      actionsEl: this.actionsEl
+    });
   },
 
   /**
@@ -180,7 +194,7 @@ FReD.charts.barchart = {
    */
   clear() {
     if (this.container) {
-      Plotly.purge(this.container);
+      FReD.charts.unmount(this.container, this.actionsEl);
       this.container.innerHTML = '';
     }
     if (this.countSpan) {

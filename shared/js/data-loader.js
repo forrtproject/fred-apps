@@ -124,10 +124,14 @@ FReD.dataLoader = {
       filtered = filtered.filter(s => s.source === filters.source);
     }
 
-    // Power filter
-    if (filters.minPower && filters.minPower > 0.05) {
-      filtered = filtered.filter(s => s.power_r >= filters.minPower);
-    }
+    // Power filter (respects keepMissingPower, default true)
+    const minPower = filters.minPower != null ? filters.minPower : 0.05;
+    const keepMissing = filters.keepMissingPower !== false;
+    filtered = filtered.filter(s => {
+      const hasPower = s.power_r != null && s.power_r !== '' && Number.isFinite(Number(s.power_r));
+      if (!hasPower) return keepMissing;
+      return Number(s.power_r) >= minPower;
+    });
 
     // Text search
     if (filters.search && filters.search.trim()) {

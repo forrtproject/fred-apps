@@ -8,26 +8,32 @@
 window.FReD = window.FReD || {};
 
 FReD.themeToggle = {
-  storageKey: 'fred-theme',
+  // Dedicated key for explicit user theme choice so legacy auto-written 'fred-theme'
+  // entries don't block returning visitors from following OS prefers-color-scheme.
+  storageKey: 'fred-theme-explicit',
 
   /**
-   * Initialize theme based on stored preference or system preference
+   * Initialize theme based on explicit stored preference or system preference
    */
   init() {
     const stored = localStorage.getItem(this.storageKey);
-
-    if (stored) {
-      this.setTheme(stored);
-    } else {
-      // Check system preference
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      this.setTheme(prefersDark ? 'dark' : 'light');
+    // Clean up legacy auto-saved key if present so it doesn't linger
+    if (localStorage.getItem('fred-theme') !== null) {
+      localStorage.removeItem('fred-theme');
     }
 
-    // Listen for system preference changes
+    if (stored === 'dark' || stored === 'light') {
+      this.setTheme(stored, false);
+    } else {
+      // Check system preference without locking localStorage
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      this.setTheme(prefersDark ? 'dark' : 'light', false);
+    }
+
+    // Listen for system preference changes until user picks an explicit theme
     window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', (e) => {
       if (!localStorage.getItem(this.storageKey)) {
-        this.setTheme(e.matches ? 'dark' : 'light');
+        this.setTheme(e.matches ? 'dark' : 'light', false);
       }
     });
 
@@ -36,11 +42,13 @@ FReD.themeToggle = {
   },
 
   /**
-   * Set the theme
+   * Set the theme (persists to localStorage only when user explicitly chooses)
    */
-  setTheme(theme) {
+  setTheme(theme, persist = true) {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem(this.storageKey, theme);
+    if (persist) {
+      localStorage.setItem(this.storageKey, theme);
+    }
 
     // Dispatch event for charts to re-render
     window.dispatchEvent(new CustomEvent('themechange', { detail: { theme } }));
@@ -78,35 +86,71 @@ FReD.themeToggle = {
   },
 
   /**
+   * Read a design token (CSS custom property) from shared/css/theme.css.
+   * Charts call this at render time so they follow the active theme.
+   */
+  token(name, fallback = '') {
+    const value = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return value || fallback;
+  },
+
+  /**
+   * Pick a readable label colour (white or dark text) for a given fill colour.
+   */
+  textOn(color) {
+    const probe = document.createElement('span');
+    probe.style.color = color;
+    document.body.appendChild(probe);
+    const rgb = getComputedStyle(probe).color.match(/\d+(\.\d+)?/g) || [0, 0, 0];
+    probe.remove();
+    const [r, g, b] = rgb.slice(0, 3).map(v => {
+      const c = Number(v) / 255;
+      return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+    });
+    const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    // Contrast against white vs. against the dark text colour (#2c2c2c, L≈0.025)
+    return (1.05 / (luminance + 0.05)) >= ((luminance + 0.05) / 0.075) ? '#ffffff' : '#2c2c2c';
+  },
+
+  /**
    * Get Plotly layout colors for current theme
    * Use this when creating/updating Plotly charts
    */
   getPlotlyLayout() {
-    const isDark = this.isDark();
+    const t = (name, fallback) => this.token(name, fallback);
+    const card = t('--white', '#ffffff');
+    const grid = t('--border-light', '#e0e1e1');
+    const line = t('--border', '#d0d1d1');
+    const text = t('--text-secondary', '#4a4a4a');
+    const fontFamily = '"Source Sans 3", "Segoe UI", system-ui, sans-serif';
+
+    const axis = {
+      gridcolor: grid,
+      linecolor: line,
+      tickcolor: line,
+      zerolinecolor: line
+    };
 
     return {
-      paper_bgcolor: isDark ? '#1E293B' : '#FFFFFF',
-      plot_bgcolor: isDark ? '#1E293B' : '#FFFFFF',
+      paper_bgcolor: card,
+      plot_bgcolor: card,
       font: {
-        color: isDark ? '#F1F5F9' : '#212529'
+        family: fontFamily,
+        color: text
       },
-      xaxis: {
-        gridcolor: isDark ? '#334155' : '#E5E3D8',
-        linecolor: isDark ? '#334155' : '#E5E3D8',
-        tickcolor: isDark ? '#334155' : '#E5E3D8',
-        zerolinecolor: isDark ? '#475569' : '#D5D3C8'
-      },
-      yaxis: {
-        gridcolor: isDark ? '#334155' : '#E5E3D8',
-        linecolor: isDark ? '#334155' : '#E5E3D8',
-        tickcolor: isDark ? '#334155' : '#E5E3D8',
-        zerolinecolor: isDark ? '#475569' : '#D5D3C8'
-      },
+      xaxis: { ...axis },
+      yaxis: { ...axis },
       legend: {
         bgcolor: 'transparent',
         font: {
-          color: isDark ? '#CBD5E1' : '#212529'
+          family: fontFamily,
+          color: text
         }
+      },
+      hoverlabel: {
+        bgcolor: '#2c2c2c',
+        bordercolor: '#2c2c2c',
+        font: { family: fontFamily, color: '#ffffff', size: 12 }
       }
     };
   },

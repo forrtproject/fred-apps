@@ -1,7 +1,10 @@
 /**
  * FReD Explorer - Forest Plot
  *
- * Creates a forest plot showing effect sizes with confidence intervals
+ * Forest plot showing original and replication effect sizes with 95% confidence
+ * intervals, rendered with Apache ECharts (SVG) custom series. Preserves
+ * pagination, sorting, effect numbering, focus continuity, top+bottom x-axis
+ * scales, and crisp PNG/SVG export.
  */
 
 window.FReD = window.FReD || {};
@@ -9,30 +12,25 @@ FReD.charts = FReD.charts || {};
 
 FReD.charts.forestplot = {
   container: null,
-  autoRenderLimit: 50,  // Auto-render only if <= this many effects
-  pageSize: 50,         // Effects per page when paginated
+  actionsEl: null,
+  autoRenderLimit: 50,
+  pageSize: 50,
   pageSizeOptions: [25, 50, 100, 200],
   currentPage: 1,
-  sortBy: 'alphabetical', // 'alphabetical', 'original', 'replication'
+  sortBy: 'alphabetical',
   allValidStudies: [],
   lastStudies: null,
+  activePlotEl: null,
 
   /**
    * Initialize the forest plot
    */
   init(containerId) {
     this.container = document.getElementById(containerId);
+    this.actionsEl = document.getElementById(containerId + '-actions');
     if (!this.container) {
       console.error('Forest plot container not found:', containerId);
-      return;
     }
-
-    // Listen for theme changes
-    window.addEventListener('themechange', () => {
-      if (this.lastStudies) {
-        this.render(this.lastStudies);
-      }
-    });
   },
 
   /**
@@ -41,7 +39,6 @@ FReD.charts.forestplot = {
   render(studies) {
     if (!this.container) return;
 
-    // Store for re-rendering on theme change
     this.lastStudies = studies;
 
     // Filter studies with valid effect sizes and references
@@ -51,9 +48,13 @@ FReD.charts.forestplot = {
     );
 
     if (this.allValidStudies.length === 0) {
+      this._unmountActive();
+      this.container.classList.add('is-empty');
       this.container.innerHTML = '<div class="alert alert-info">No effects with effect size data to display.</div>';
       return;
     }
+
+    this.container.classList.remove('is-empty');
 
     // Assign effect numbers BEFORE sorting (based on original data order)
     this.assignEffectNumbers();
@@ -63,30 +64,32 @@ FReD.charts.forestplot = {
 
     const totalEffects = this.allValidStudies.length;
 
-    // If within auto-render limit, show directly
     if (totalEffects <= this.autoRenderLimit) {
       this.renderPlot(this.allValidStudies, totalEffects);
       return;
     }
 
-    // Otherwise, show pagination controls
     this.currentPage = 1;
     this.renderWithPagination();
   },
 
+  _unmountActive() {
+    if (this.activePlotEl) {
+      FReD.charts.unmount(this.activePlotEl, this.actionsEl);
+      this.activePlotEl = null;
+    }
+  },
+
   /**
    * Assign effect numbers to each study (e.g., [1/3], [2/3], [3/3] for studies with same ref_o)
-   * This is done BEFORE sorting so the numbering is stable
    */
   assignEffectNumbers() {
-    // Count total effects per ref_o
     const refCounts = new Map();
     for (const study of this.allValidStudies) {
       const ref = study.ref_o || 'Unknown';
       refCounts.set(ref, (refCounts.get(ref) || 0) + 1);
     }
 
-    // Assign numbers in order of appearance
     const refCurrentIndex = new Map();
     for (const study of this.allValidStudies) {
       const ref = study.ref_o || 'Unknown';
@@ -94,29 +97,33 @@ FReD.charts.forestplot = {
       const current = (refCurrentIndex.get(ref) || 0) + 1;
       refCurrentIndex.set(ref, current);
 
-      // Store the effect number info on the study object
       study._effectNum = current;
       study._effectTotal = total;
     }
   },
 
   /**
-   * Apply current sorting to studies
-   * Sorting is applied to ALL studies before pagination
+   * Apply current sorting to studies before pagination
    */
   applySorting() {
+    const compareNullableDesc = (aVal, bVal) => {
+      const aValid = aVal != null && !isNaN(aVal);
+      const bValid = bVal != null && !isNaN(bVal);
+      if (!aValid && !bValid) return 0;
+      if (!aValid) return 1;
+      if (!bValid) return -1;
+      return bVal - aVal;
+    };
+
     switch (this.sortBy) {
       case 'original':
-        // Sort by original effect size descending (largest at top)
-        this.allValidStudies.sort((a, b) => (b.es_o || 0) - (a.es_o || 0));
+        this.allValidStudies.sort((a, b) => compareNullableDesc(a.es_o, b.es_o));
         break;
       case 'replication':
-        // Sort by replication effect size descending (largest at top)
-        this.allValidStudies.sort((a, b) => (b.es_r || 0) - (a.es_r || 0));
+        this.allValidStudies.sort((a, b) => compareNullableDesc(a.es_r, b.es_r));
         break;
       case 'alphabetical':
       default:
-        // Sort alphabetically, then by effect number within same ref_o
         this.allValidStudies.sort((a, b) => {
           const refCompare = (a.ref_o || '').localeCompare(b.ref_o || '');
           if (refCompare !== 0) return refCompare;
@@ -126,27 +133,44 @@ FReD.charts.forestplot = {
     }
   },
 
+  _restoreFocus(id) {
+    if (!id) return;
+    const el = document.getElementById(id);
+    if (el && !el.disabled) {
+      el.focus();
+    } else if (id === 'forest-next') {
+      document.getElementById('forest-prev')?.focus();
+    } else if (id === 'forest-prev') {
+      document.getElementById('forest-next')?.focus();
+    }
+  },
+
   /**
    * Render with pagination controls
    */
-  renderWithPagination() {
+  renderWithPagination(refocusId) {
+    this._unmountActive();
+
     const totalEffects = this.allValidStudies.length;
     const totalPages = Math.ceil(totalEffects / this.pageSize);
     const startIdx = (this.currentPage - 1) * this.pageSize;
     const endIdx = Math.min(startIdx + this.pageSize, totalEffects);
     const pageStudies = this.allValidStudies.slice(startIdx, endIdx);
 
-    // Build page size options
     const pageSizeOptionsHtml = this.pageSizeOptions
       .map(size => `<option value="${size}" ${size === this.pageSize ? 'selected' : ''}>${size}</option>`)
       .join('');
 
-    // Create controls container
+    const totalSelected = Array.isArray(this.lastStudies) ? this.lastStudies.length : totalEffects;
+    const coverageSuffix = totalSelected > totalEffects
+      ? ` with effect sizes (of ${totalSelected.toLocaleString()} selected)`
+      : '';
+
     const controlsHtml = `
       <div class="forest-controls">
         <div class="forest-controls-left">
           <span class="text-muted">
-            Showing ${startIdx + 1}-${endIdx} of ${totalEffects} effects
+            Showing ${startIdx + 1}-${endIdx} of ${totalEffects.toLocaleString()} effects${coverageSuffix}
           </span>
           <div class="forest-control-group">
             <label for="forest-page-size" class="forest-control-label">Per page:</label>
@@ -165,62 +189,60 @@ FReD.charts.forestplot = {
         </div>
         <div class="forest-controls-right">
           <div class="btn-group">
-            <button class="btn btn-sm btn-secondary" id="forest-prev" ${this.currentPage === 1 ? 'disabled' : ''}>
+            <button type="button" class="btn btn-sm btn-secondary" id="forest-prev" ${this.currentPage === 1 ? 'disabled' : ''}>
               &laquo; Prev
             </button>
-            <span class="forest-page-indicator">
+            <span class="forest-page-indicator" aria-live="polite">
               ${this.currentPage}/${totalPages}
             </span>
-            <button class="btn btn-sm btn-secondary" id="forest-next" ${this.currentPage === totalPages ? 'disabled' : ''}>
+            <button type="button" class="btn btn-sm btn-secondary" id="forest-next" ${this.currentPage === totalPages ? 'disabled' : ''}>
               Next &raquo;
             </button>
           </div>
           <div class="btn-group">
-            <button class="btn btn-sm btn-outline-secondary" id="forest-download-png" title="Download as PNG">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="forest-download-png" title="Download as PNG">
               PNG
             </button>
-            <button class="btn btn-sm btn-outline-secondary" id="forest-download-svg" title="Download as SVG">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="forest-download-svg" title="Download as SVG">
               SVG
             </button>
           </div>
         </div>
       </div>
-      <div id="forest-plot-area"></div>
+      <div class="forest-plot-scroll" id="forest-plot-scroll" tabindex="0" role="region" aria-label="Forest plot scroll area">
+        <div id="forest-plot-area"></div>
+      </div>
     `;
 
     this.container.innerHTML = controlsHtml;
 
-    // Setup event listeners for pagination
     document.getElementById('forest-prev')?.addEventListener('click', () => {
       if (this.currentPage > 1) {
         this.currentPage--;
-        this.renderWithPagination();
+        this.renderWithPagination('forest-prev');
       }
     });
 
     document.getElementById('forest-next')?.addEventListener('click', () => {
       if (this.currentPage < totalPages) {
         this.currentPage++;
-        this.renderWithPagination();
+        this.renderWithPagination('forest-next');
       }
     });
 
-    // Page size selector
     document.getElementById('forest-page-size')?.addEventListener('change', (e) => {
       this.pageSize = parseInt(e.target.value, 10);
-      this.currentPage = 1; // Reset to first page
-      this.renderWithPagination();
+      this.currentPage = 1;
+      this.renderWithPagination('forest-page-size');
     });
 
-    // Sort selector
     document.getElementById('forest-sort')?.addEventListener('change', (e) => {
       this.sortBy = e.target.value;
       this.applySorting();
-      this.currentPage = 1; // Reset to first page
-      this.renderWithPagination();
+      this.currentPage = 1;
+      this.renderWithPagination('forest-sort');
     });
 
-    // Download buttons
     document.getElementById('forest-download-png')?.addEventListener('click', () => {
       this.downloadPlot('png');
     });
@@ -229,39 +251,42 @@ FReD.charts.forestplot = {
       this.downloadPlot('svg');
     });
 
-    // Render the plot in the plot area
     const plotContainer = document.getElementById('forest-plot-area');
-    this.renderPlotToElement(pageStudies, totalEffects, plotContainer);
+    const scrollContainer = document.getElementById('forest-plot-scroll');
+    this.renderPlotToElement(pageStudies, totalEffects, plotContainer, `Showing ${startIdx + 1}-${endIdx} of ${totalEffects}`, scrollContainer);
+    this._restoreFocus(refocusId);
   },
 
   /**
    * Download the plot as PNG or SVG
    */
   downloadPlot(format) {
-    const plotArea = document.getElementById('forest-plot-area') || this.container;
+    const plotArea = document.getElementById('forest-plot-area') || this.activePlotEl;
     if (!plotArea) return;
-
     const filename = `forest-plot-${new Date().toISOString().slice(0, 10)}`;
-
-    Plotly.downloadImage(plotArea, {
-      format: format,
-      filename: filename,
-      width: 1200,
-      height: plotArea.offsetHeight || 800,
-      scale: 2
-    });
+    if (format === 'svg') {
+      FReD.charts.exportSvg(plotArea, filename);
+    } else {
+      FReD.charts.exportPng(plotArea, filename, 2);
+    }
   },
 
   /**
    * Render plot to container element (for <= autoRenderLimit effects)
    */
-  renderPlot(validStudies, totalCount) {
-    // Create controls with count info, sort options, and download buttons
+  renderPlot(validStudies, totalCount, refocusId) {
+    this._unmountActive();
+
+    const totalSelected = Array.isArray(this.lastStudies) ? this.lastStudies.length : validStudies.length;
+    const coverageSuffix = totalSelected > validStudies.length
+      ? ` with effect sizes (of ${totalSelected.toLocaleString()} selected)`
+      : '';
+
     const controlsHtml = `
       <div class="forest-controls">
         <div class="forest-controls-left">
           <span class="text-muted">
-            ${validStudies.length} effect sizes
+            ${validStudies.length.toLocaleString()} ${validStudies.length === 1 ? 'effect' : 'effects'}${coverageSuffix}
           </span>
           <div class="forest-control-group">
             <label for="forest-sort-simple" class="forest-control-label">Sort:</label>
@@ -274,28 +299,28 @@ FReD.charts.forestplot = {
         </div>
         <div class="forest-controls-right">
           <div class="btn-group">
-            <button class="btn btn-sm btn-outline-secondary" id="forest-download-png-simple" title="Download as PNG">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="forest-download-png-simple" title="Download as PNG">
               PNG
             </button>
-            <button class="btn btn-sm btn-outline-secondary" id="forest-download-svg-simple" title="Download as SVG">
+            <button type="button" class="btn btn-sm btn-outline-secondary" id="forest-download-svg-simple" title="Download as SVG">
               SVG
             </button>
           </div>
         </div>
       </div>
-      <div id="forest-plot-area-simple"></div>
+      <div class="forest-plot-scroll" id="forest-plot-scroll-simple" tabindex="0" role="region" aria-label="Forest plot scroll area">
+        <div id="forest-plot-area-simple"></div>
+      </div>
     `;
 
     this.container.innerHTML = controlsHtml;
 
-    // Sort selector
     document.getElementById('forest-sort-simple')?.addEventListener('change', (e) => {
       this.sortBy = e.target.value;
       this.applySorting();
-      this.renderPlot(this.allValidStudies, totalCount);
+      this.renderPlot(this.allValidStudies, totalCount, 'forest-sort-simple');
     });
 
-    // Download buttons
     document.getElementById('forest-download-png-simple')?.addEventListener('click', () => {
       this.downloadPlotSimple('png');
     });
@@ -304,49 +329,39 @@ FReD.charts.forestplot = {
       this.downloadPlotSimple('svg');
     });
 
-    // Render the plot
     const plotContainer = document.getElementById('forest-plot-area-simple');
-    this.renderPlotToElement(validStudies, totalCount, plotContainer);
+    const scrollContainer = document.getElementById('forest-plot-scroll-simple');
+    this.renderPlotToElement(validStudies, totalCount, plotContainer, `${validStudies.length} effects`, scrollContainer);
+    this._restoreFocus(refocusId);
   },
 
   /**
    * Download the plot as PNG or SVG (simple mode)
    */
   downloadPlotSimple(format) {
-    const plotArea = document.getElementById('forest-plot-area-simple');
+    const plotArea = document.getElementById('forest-plot-area-simple') || this.activePlotEl;
     if (!plotArea) return;
-
     const filename = `forest-plot-${new Date().toISOString().slice(0, 10)}`;
-
-    Plotly.downloadImage(plotArea, {
-      format: format,
-      filename: filename,
-      width: 1200,
-      height: plotArea.offsetHeight || 800,
-      scale: 2
-    });
+    if (format === 'svg') {
+      FReD.charts.exportSvg(plotArea, filename);
+    } else {
+      FReD.charts.exportPng(plotArea, filename, 2);
+    }
   },
 
   /**
    * Extract "Author (Year)" from a reference string
-   * Converts "Smith, J., Jones, K., & Brown, M. (2020)" to "Smith et al. (2020)"
-   * Converts "Smith, J., & Jones, K. (2020)" to "Smith & Jones (2020)"
-   * Converts "Smith, J. (2020)" to "Smith (2020)"
    */
   extractAuthorYear(ref) {
     if (!ref) return 'Unknown';
 
-    // First extract the year
     const yearMatch = ref.match(/\((\d{4})\)/);
     if (!yearMatch) {
       return this.truncateRef(ref, 35);
     }
     const year = yearMatch[1];
-
-    // Get everything before the year
     const beforeYear = ref.substring(0, ref.indexOf(`(${year})`)).trim();
 
-    // Check for "et al." already in the reference
     if (/et\s+al\.?/i.test(beforeYear)) {
       const etAlMatch = beforeYear.match(/^([A-Za-z\-']+)(?:,?\s+[A-Z]\.?,?)?\s+et\s+al\.?/i);
       if (etAlMatch) {
@@ -354,51 +369,47 @@ FReD.charts.forestplot = {
       }
     }
 
-    // Split by common author separators to count authors
-    // Pattern: "Surname, I., Surname2, I., & Surname3, I."
-    // or "Surname, I., & Surname2, I."
-    // or "Surname, I."
-
-    // Extract surnames (words before commas followed by initials)
     const authorParts = beforeYear.split(/,\s*&\s*|,\s+(?=[A-Z][a-z])|;\s*|\s+&\s+/);
-
-    // Filter to get actual author names (surname followed by optional initials)
     const surnames = [];
     for (const part of authorParts) {
       const trimmed = part.trim();
       if (!trimmed) continue;
-      // Extract the surname (first word that's not an initial)
       const surnameMatch = trimmed.match(/^([A-Za-z\-']+)/);
       if (surnameMatch && surnameMatch[1].length > 1) {
         surnames.push(surnameMatch[1]);
       }
     }
 
-    if (surnames.length === 0) {
-      return this.truncateRef(ref, 35);
-    }
-
-    if (surnames.length === 1) {
-      return `${surnames[0]} (${year})`;
-    }
-
-    if (surnames.length === 2) {
-      return `${surnames[0]} & ${surnames[1]} (${year})`;
-    }
-
-    // 3+ authors: use "et al."
+    if (surnames.length === 0) return this.truncateRef(ref, 35);
+    if (surnames.length === 1) return `${surnames[0]} (${year})`;
+    if (surnames.length === 2) return `${surnames[0]} & ${surnames[1]} (${year})`;
     return `${surnames[0]} et al. (${year})`;
   },
 
   /**
-   * Format reference for hover display with line breaks
+   * Shorten a study label while ALWAYS preserving (year) and [k/n] suffix
+   */
+  compactLabel(fullLabel, maxChars) {
+    if (!fullLabel || fullLabel.length <= maxChars) return fullLabel;
+    const suffixMatch = fullLabel.match(/(\s*\(\d{4}\)(?:\s*\[\d+\/\d+\])?|\s*\[\d+\/\d+\])$/);
+    if (suffixMatch) {
+      const suffix = suffixMatch[1];
+      const prefixBudget = Math.max(6, maxChars - suffix.length - 1);
+      const prefix = fullLabel.slice(0, fullLabel.length - suffix.length).trim();
+      if (prefix.length > prefixBudget) {
+        return prefix.slice(0, prefixBudget) + '\u2026' + suffix;
+      }
+    }
+    return fullLabel.slice(0, Math.max(4, maxChars - 1)) + '\u2026';
+  },
+
+  /**
+   * Format reference for hover display with line breaks (escaped)
    */
   formatRefForHover(ref) {
     if (!ref) return 'Unknown';
-
-    // Insert line breaks roughly every 50 characters, at word boundaries
     const maxLineLength = 50;
-    const words = ref.split(/\s+/);
+    const words = String(ref).split(/\s+/);
     const lines = [];
     let currentLine = '';
 
@@ -412,200 +423,281 @@ FReD.charts.forestplot = {
     }
     if (currentLine) lines.push(currentLine);
 
-    return lines.join('<br>');
+    return lines.map(FReD.charts.escapeHtml).join('<br>');
   },
 
   /**
-   * Create unique axis labels with staggering for CONSECUTIVE effects from same original
-   * Only staggers entries that are next to each other and share the same ref_o
-   * Returns { yPositions: number[], tickvals: number[], ticktext: string[] }
+   * Build labels for each displayed effect row
    */
   createStaggeredLabels(validStudies) {
-    const yPositions = [];
-    const tickvals = [];
     const ticktext = [];
-
-    let yPos = 0;
-    let prevRef = null;
-
     for (let i = 0; i < validStudies.length; i++) {
       const study = validStudies[i];
       const ref = study.ref_o || 'Unknown';
       const effectNum = study._effectNum || 1;
       const effectTotal = study._effectTotal || 1;
-
-      // Base label
       const baseLabel = this.extractAuthorYear(ref);
-
-      // Add suffix if there are multiple effects from this original
-      if (effectTotal > 1) {
-        ticktext.push(`${baseLabel} [${effectNum}/${effectTotal}]`);
-      } else {
-        ticktext.push(baseLabel);
-      }
-
-      // Determine y position
-      if (i === 0) {
-        yPos = 0;
-      } else if (ref === prevRef) {
-        // Same ref_o as previous - stagger closer together
-        yPos += 0.6;
-      } else {
-        // Different ref_o - normal spacing
-        yPos += 1.0;
-      }
-
-      yPositions.push(yPos);
-      tickvals.push(yPos);
-      prevRef = ref;
+      ticktext.push(effectTotal > 1 ? `${baseLabel} [${effectNum}/${effectTotal}]` : baseLabel);
     }
-
-    return { yPositions, tickvals, ticktext };
+    return { ticktext };
   },
 
   /**
-   * Render plot to specific element
+   * Render ECharts SVG forest plot into `element`
    */
-  renderPlotToElement(validStudies, totalCount, element) {
+  renderPlotToElement(validStudies, totalCount, element, rangeNote, scrollContainer) {
     if (!element) return;
+    this.activePlotEl = element;
 
-    // Create staggered y positions for proper visualization
-    const { yPositions, tickvals, ticktext } = this.createStaggeredLabels(validStudies);
+    const { ticktext } = this.createStaggeredLabels(validStudies);
 
-    // Prepare hover data
-    const hoverRefsOriginal = validStudies.map(s => this.formatRefForHover(s.ref_o));
-    const hoverRefsReplication = validStudies.map(s => this.formatRefForHover(s.ref_r));
+    // Compute clean 0.25-snapped x-axis bounds so ticks never crowd at the right edge
+    const allEffects = [];
+    validStudies.forEach(s => {
+      [s.es_o, s.es_r, s.ci_lower_o, s.ci_upper_o, s.ci_lower_r, s.ci_upper_r].forEach(v => {
+        if (v != null && !isNaN(v)) allEffects.push(Number(v));
+      });
+    });
 
-    // Original effect sizes
-    const originalTrace = {
-      x: validStudies.map(s => s.es_o),
-      y: yPositions,
-      customdata: hoverRefsOriginal,
-      error_x: {
-        type: 'data',
-        symmetric: false,
-        array: validStudies.map(s =>
-          s.ci_upper_o != null ? s.ci_upper_o - s.es_o : 0
-        ),
-        arrayminus: validStudies.map(s =>
-          s.ci_lower_o != null ? s.es_o - s.ci_lower_o : 0
-        ),
-        color: '#2563eb'  // Blue for original
-      },
-      type: 'scatter',
-      mode: 'markers',
-      name: 'Original',
-      marker: {
-        color: '#2563eb',  // Blue - visually dominant
-        size: 8
-      },
-      hovertemplate: '<b>%{customdata}</b><br><br>Original r = %{x:.3f}<extra></extra>'
+    const rawMin = Math.min(...allEffects, -0.1);
+    const rawMax = Math.max(...allEffects, 0.1);
+    const xMin = Math.floor(rawMin * 4) / 4;
+    const xMax = Math.ceil(rawMax * 4) / 4;
+    const xInterval = (xMax - xMin) > 2 ? 0.5 : 0.25;
+
+    // Build data rows: [x, rowIndex, ciLower, ciUpper]
+    const origData = [];
+    const repData = [];
+    const tableRows = [];
+
+    validStudies.forEach((s, i) => {
+      if (s.es_o != null && !isNaN(s.es_o)) {
+        const hasCiO = s.ci_lower_o != null && !isNaN(s.ci_lower_o) && s.ci_upper_o != null && !isNaN(s.ci_upper_o);
+        origData.push({
+          value: [
+            Number(s.es_o),
+            i,
+            hasCiO ? Number(s.ci_lower_o) : Number(s.es_o),
+            hasCiO ? Number(s.ci_upper_o) : Number(s.es_o),
+            hasCiO ? 1 : 0
+          ],
+          ref: s.ref_o || 'Unknown',
+          hasCi: hasCiO
+        });
+      }
+      if (s.es_r != null && !isNaN(s.es_r)) {
+        const hasCiR = s.ci_lower_r != null && !isNaN(s.ci_lower_r) && s.ci_upper_r != null && !isNaN(s.ci_upper_r);
+        repData.push({
+          value: [
+            Number(s.es_r),
+            i,
+            hasCiR ? Number(s.ci_lower_r) : Number(s.es_r),
+            hasCiR ? Number(s.ci_upper_r) : Number(s.es_r),
+            hasCiR ? 1 : 0
+          ],
+          ref: s.ref_r || 'Unknown',
+          hasCi: hasCiR
+        });
+      }
+
+      tableRows.push([
+        ticktext[i],
+        s.es_o != null && !isNaN(s.es_o) ? Number(s.es_o) : '',
+        s.ci_lower_o != null && !isNaN(s.ci_lower_o) ? Number(s.ci_lower_o) : '',
+        s.ci_upper_o != null && !isNaN(s.ci_upper_o) ? Number(s.ci_upper_o) : '',
+        s.es_r != null && !isNaN(s.es_r) ? Number(s.es_r) : '',
+        s.ci_lower_r != null && !isNaN(s.ci_lower_r) ? Number(s.ci_lower_r) : '',
+        s.ci_upper_r != null && !isNaN(s.ci_upper_r) ? Number(s.ci_upper_r) : ''
+      ]);
+    });
+
+    const table = {
+      headers: ['Study', 'Original r', 'Orig CI lower', 'Orig CI upper', 'Replication r', 'Rep CI lower', 'Rep CI upper'],
+      rows: tableRows,
+      summary: `Forest plot effect sizes and 95% confidence intervals (${rangeNote}, sorted ${this.sortBy}).`
     };
 
-    // Replication effect sizes
-    const replicationTrace = {
-      x: validStudies.map(s => s.es_r),
-      y: yPositions,
-      customdata: hoverRefsReplication,
-      error_x: {
-        type: 'data',
-        symmetric: false,
-        array: validStudies.map(s =>
-          s.ci_upper_r != null ? s.ci_upper_r - s.es_r : 0
-        ),
-        arrayminus: validStudies.map(s =>
-          s.ci_lower_r != null ? s.es_r - s.ci_lower_r : 0
-        ),
-        color: 'rgba(100,100,100,0.6)'  // Gray for replication
-      },
-      type: 'scatter',
-      mode: 'markers',
-      name: 'Replication',
-      marker: {
-        color: 'rgba(100,100,100,0.7)',  // Gray - less dominant
-        size: 8
-      },
-      hovertemplate: '<b>%{customdata}</b><br><br>Replication r = %{x:.3f}<extra></extra>'
+    const self = this;
+
+    const optionFn = ({ width }) => {
+      const t = FReD.charts.chartTheme();
+      const colorOrig = FReD.charts.token('--color-chart-original');
+      const colorRep = FReD.charts.token('--color-chart-replication');
+      const isNarrow = width < 560;
+      const maxLabelChars = isNarrow ? 22 : 34;
+      const displayLabels = ticktext.map(lbl => self.compactLabel(lbl, maxLabelChars));
+
+      function renderWhiskerPoint(color, dodgePx, shapeKind) {
+        return function (params, api) {
+          const xVal = api.value(0);
+          const yIdx = api.value(1);
+          const loVal = api.value(2);
+          const hiVal = api.value(3);
+          const hasCi = api.value(4) === 1;
+          const center = api.coord([xVal, yIdx]);
+          const left = api.coord([loVal, yIdx]);
+          const right = api.coord([hiVal, yIdx]);
+          const cy = center[1] + dodgePx;
+
+          const children = [];
+          if (hasCi && right[0] - left[0] > 0.5) {
+            children.push({
+              type: 'line',
+              shape: { x1: left[0], y1: cy, x2: right[0], y2: cy },
+              style: { stroke: color, lineWidth: 1.75 }
+            });
+            children.push({
+              type: 'line',
+              shape: { x1: left[0], y1: cy - 3, x2: left[0], y2: cy + 3 },
+              style: { stroke: color, lineWidth: 1.5 }
+            });
+            children.push({
+              type: 'line',
+              shape: { x1: right[0], y1: cy - 3, x2: right[0], y2: cy + 3 },
+              style: { stroke: color, lineWidth: 1.5 }
+            });
+          }
+
+          if (shapeKind === 'diamond') {
+            const r = 4.6;
+            children.push({
+              type: 'polygon',
+              shape: {
+                points: [
+                  [center[0], cy - r],
+                  [center[0] + r, cy],
+                  [center[0], cy + r],
+                  [center[0] - r, cy]
+                ]
+              },
+              style: { fill: color, stroke: t.paper, lineWidth: 1 }
+            });
+          } else {
+            children.push({
+              type: 'circle',
+              shape: { cx: center[0], cy: cy, r: 4.3 },
+              style: { fill: color, stroke: t.paper, lineWidth: 1 }
+            });
+          }
+
+          return { type: 'group', children: children };
+        };
+      }
+
+      // Dedicated silent series for zero line so hiding Original never removes x = 0
+      const series = [
+        {
+          name: '_zero_line',
+          type: 'scatter',
+          silent: true,
+          symbolSize: 0,
+          data: [],
+          markLine: {
+            silent: true,
+            symbol: ['none', 'none'],
+            animation: false,
+            label: { show: false },
+            lineStyle: { color: t.rule, width: 1.5, type: 'dotted' },
+            data: [{ xAxis: 0 }]
+          }
+        },
+        {
+          name: 'Original',
+          type: 'custom',
+          itemStyle: { color: colorOrig },
+          renderItem: renderWhiskerPoint(colorOrig, -3.5, 'circle'),
+          encode: { x: 0, y: 1 },
+          data: origData
+        },
+        {
+          name: 'Replication',
+          type: 'custom',
+          itemStyle: { color: colorRep },
+          renderItem: renderWhiskerPoint(colorRep, 3.5, 'diamond'),
+          encode: { x: 0, y: 1 },
+          data: repData
+        }
+      ];
+
+      const tooltip = {
+        trigger: 'item',
+        formatter: p => {
+          const d = p.data || {};
+          const v = d.value || [];
+          const est = FReD.utils.formatNumber(v[0], 3);
+          const ci = d.hasCi ? ` (95% CI [${FReD.utils.formatNumber(v[2], 3)}, ${FReD.utils.formatNumber(v[3], 3)}])` : '';
+          const swatchColor = p.seriesName === 'Original' ? colorOrig : colorRep;
+          return FReD.charts.tipLines([
+            `<strong>${self.formatRefForHover(d.ref)}</strong>`,
+            FReD.charts.tipRow(swatchColor, `${p.seriesName} r = ${est}${ci}`)
+          ]);
+        }
+      };
+
+      const formatAxisVal = v => {
+        const clean = Math.abs(v) < 1e-9 ? 0 : v;
+        return Number(clean.toFixed(2)).toString();
+      };
+
+      const effectiveInterval = width < 460 ? Math.max(xInterval, 0.5) : xInterval;
+      const effMin = width < 460 ? Math.floor(rawMin / effectiveInterval) * effectiveInterval : xMin;
+      const effMax = width < 460 ? Math.ceil(rawMax / effectiveInterval) * effectiveInterval : xMax;
+
+      const bottomAxis = FReD.charts.valueAxis({
+        position: 'bottom',
+        name: 'Effect Size (r)',
+        nameGap: 30,
+        min: effMin,
+        max: effMax,
+        interval: effectiveInterval,
+        axisLabel: { formatter: formatAxisVal }
+      });
+
+      // Mirror scale at top so rows near the top of long scrolled forest plots always have a visible scale
+      const topAxis = FReD.charts.valueAxis({
+        position: 'top',
+        min: effMin,
+        max: effMax,
+        interval: effectiveInterval,
+        splitLine: { show: false },
+        axisLabel: { formatter: formatAxisVal }
+      });
+
+      return FReD.charts.finishOption({
+        series: series,
+        tooltip: tooltip,
+        legend: {
+          data: [
+            { name: 'Original', icon: 'circle', itemStyle: { color: colorOrig } },
+            { name: 'Replication', icon: 'diamond', itemStyle: { color: colorRep } }
+          ]
+        },
+        xAxis: [bottomAxis, topAxis],
+        yAxis: FReD.charts.categoryAxis({
+          data: displayLabels,
+          inverse: true,
+          axisLabel: {
+            interval: 0,
+            fontSize: 11
+          }
+        }),
+        grid: { left: 16, right: 22, top: 28, bottom: 28, containLabel: true }
+      }, { width });
     };
 
-    // Zero line
-    const zeroLine = {
-      x: [0, 0],
-      y: [yPositions[0], yPositions[yPositions.length - 1]],
-      type: 'scatter',
-      mode: 'lines',
-      line: { color: 'rgba(128,128,128,0.8)', width: 2 },
-      hoverinfo: 'skip',
-      showlegend: false
-    };
+    const rowHeight = 28;
+    const minHeight = validStudies.length <= 3 ? 150 : 220;
+    const chromeHeight = validStudies.length <= 3 ? 108 : 124;
+    const plotHeight = Math.max(minHeight, validStudies.length * rowHeight + chromeHeight);
 
-    // Calculate x-axis range
-    const allEffects = [
-      ...validStudies.map(s => s.es_o).filter(x => x != null),
-      ...validStudies.map(s => s.es_r).filter(x => x != null),
-      ...validStudies.map(s => s.ci_lower_o).filter(x => x != null),
-      ...validStudies.map(s => s.ci_upper_o).filter(x => x != null),
-      ...validStudies.map(s => s.ci_lower_r).filter(x => x != null),
-      ...validStudies.map(s => s.ci_upper_r).filter(x => x != null)
-    ];
-
-    const xMin = Math.floor(Math.min(...allEffects, -0.1) * 10) / 10;
-    const xMax = Math.ceil(Math.max(...allEffects, 0.1) * 10) / 10;
-
-    // Calculate dynamic height based on actual y range
-    const yRange = yPositions[yPositions.length - 1] - yPositions[0];
-    const plotHeight = Math.max(400, yRange * 25 + 100);
-
-    // Get theme-aware layout
-    const themeLayout = FReD.themeToggle ? FReD.themeToggle.getPlotlyLayout() : {};
-
-    const layout = {
-      paper_bgcolor: themeLayout.paper_bgcolor || '#FFFFFF',
-      plot_bgcolor: themeLayout.plot_bgcolor || '#FFFFFF',
-      font: themeLayout.font || {},
-      xaxis: {
-        title: 'Effect Size (r)',
-        range: [xMin - 0.1, xMax + 0.1],
-        zeroline: true,
-        zerolinewidth: 2,
-        zerolinecolor: themeLayout.xaxis?.zerolinecolor || 'rgba(128,128,128,0.5)',
-        gridcolor: themeLayout.xaxis?.gridcolor,
-        linecolor: themeLayout.xaxis?.linecolor,
-        showline: false,
-        mirror: false
-      },
-      yaxis: {
-        automargin: true,
-        range: [Math.max(...yPositions) + 0.5, -1],  // Reversed; -1 gives top padding above first entry at y=0
-        tickmode: 'array',
-        tickvals: tickvals,
-        ticktext: ticktext,
-        tickfont: { size: 10, color: themeLayout.font?.color },
-        showgrid: false,
-        showline: false,
-        mirror: false,
-        zeroline: false
-      },
-      legend: {
-        orientation: 'h',
-        y: 1.02,
-        x: 1,
-        xanchor: 'right',
-        bgcolor: 'transparent',
-        font: themeLayout.legend?.font || {}
-      },
-      margin: { t: 60, r: 20, b: 60, l: 200 },
+    FReD.charts.mount(element, {
+      title: `Forest plot (${rangeNote})`,
+      option: optionFn,
       height: plotHeight,
-      hovermode: 'closest'
-    };
-
-    const config = {
-      displayModeBar: false,
-      responsive: true,
-      scrollZoom: false
-    };
-
-    Plotly.newPlot(element, [zeroLine, originalTrace, replicationTrace], layout, config);
+      table: table,
+      actionsEl: this.actionsEl,
+      disclosureAfterEl: scrollContainer || element
+    });
   },
 
   /**
@@ -621,8 +713,8 @@ FReD.charts.forestplot = {
    * Clear the plot
    */
   clear() {
+    this._unmountActive();
     if (this.container) {
-      Plotly.purge(this.container);
       this.container.innerHTML = '';
     }
   }

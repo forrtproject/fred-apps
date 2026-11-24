@@ -1,215 +1,138 @@
 # FReD Apps Style Rules
 
-This document outlines the design system and theme rules for the FReD static apps to maintain visual consistency.
+The FReD apps (landing page, Explorer, Annotator) use the design system of the
+**FLoRA Replication Atlas** ([live](https://forrt.org/flora-replication-atlas/),
+source: `forrtproject/flora-replication-atlas`, `src/index.css`). When something
+below doesn't cover a case, copy what the Atlas does.
+
+All tokens live in [`shared/css/theme.css`](shared/css/theme.css). Component CSS
+and JavaScript read tokens; they never hard-code colours.
 
 ---
 
-## Color Palette
+## Colour
 
-### Primary Colors (Branding)
-| Variable | Light Mode | Dark Mode | Usage |
-|----------|------------|-----------|-------|
-| `--fred-primary` | `#3F0508` | `#3F0508` | Header backgrounds, primary buttons, active sidebar nav |
-| `--fred-primary-dark` | `#2A0305` | `#2A0305` | Header gradient end, button hover states |
-| `--fred-primary-light` | `#5C1015` | `#7A2530` | Subtle accents |
+### Brand and surfaces
+| Token | Light | Dark | Use |
+|---|---|---|---|
+| `--primary` | `#853953` | `#d68aa7` | Links, primary buttons, active states, headline numbers |
+| `--primary-dark` | `#612d53` | `#e7a9c0` | Hover for primary |
+| `--primary-light` | `#a04d6b` | `#c27093` | KPI labels |
+| `--primary-faint` | `#f9f0f4` | `#3a2530` | Active row, KPI band, hover tint |
+| `--primary-soft` | `#ecd9e0` | `#5a3446` | Feature-card border, underlines |
+| `--on-primary` | `#fff` | `#1b181a` | Text on a `--primary` fill |
+| `--neutral` | `#2c2c2c` | `#121011` | Top bar and footer |
+| `--surface` | `#f3f4f4` | `#1b181a` | Page background, inset panels, table header |
+| `--surface-alt` | `#e8e9e9` | `#242023` | Secondary-button hover, tracks |
+| `--white` | `#fff` | `#2a2528` | Cards, panels, inputs, chart background |
 
-### Accent Colors
-| Variable | Value | Usage |
-|----------|-------|-------|
-| `--fred-accent-teal` | `#4DCCD0` | Success/significant indicators, effect count badge, dark mode active tabs |
-| `--fred-accent-coral` | `#FA948C` | Failure/not significant indicators |
+### Text and lines
+| Token | Light | Dark |
+|---|---|---|
+| `--text` | `#2c2c2c` | `#ece8ea` |
+| `--text-secondary` | `#4a4a4a` | `#cdc6ca` |
+| `--text-muted` | `#5c5c5c` | `#a9a1a6` |
+| `--text-faint` | `#696969` | `#958d92` |
+| `--border` | `#d0d1d1` | `#463f43` |
+| `--border-light` | `#e0e1e1` | `#383236` |
 
-### Outcome Colors
-| Variable | Light Mode | Dark Mode | Usage |
-|----------|------------|-----------|-------|
-| `--fred-success` | `#8FBC8F` | `#6BA86B` | Replication success outcomes |
-| `--fred-failure` | `#FF7F7F` | `#E06060` | Replication failure outcomes |
-| `--fred-failure-reversal` | `darkred` | `darkred` | Reversal outcomes |
-| `--fred-not-significant` | `#D3D3D3` | `#888888` | Original study not significant |
-| `--fred-not-coded` | `#C8C8C8` | `#666666` | Outcome not yet coded |
-| `--fred-mixed` | `#efa986` | `#efa986` | Mixed results |
+### Outcomes: these encode data, not decoration
+There are two distinct outcome palettes:
+- **UI chrome** (badges, alerts, verdict text) uses the Atlas status tokens (`--success`, `--warning`, `--error`).
+- **ECharts figures** (bars, scatter points, trend lines, legends) use the FLoRA Explorer `--color-chart-*` palette (`forrtproject/flora-explorer`, `react-frontend` branch `src/styles/tokens.css`), tuned so in-bar labels stay readable and series marks keep at least 3:1 contrast in dark mode.
 
-### UI Colors
-| Variable | Light Mode | Dark Mode | Usage |
-|----------|------------|-----------|-------|
-| `--fred-bg` | `#FEFDF6` (warm cream) | `#1A1D1E` | Page background |
-| `--fred-bg-alt` | `#F5F4ED` | `#242829` | Sidebar, footer, alternating rows |
-| `--fred-bg-card` | `#FFFFFF` | `#2A2E30` | Card backgrounds |
-| `--fred-border` | `#E5E3D8` | `#3A3E40` | Borders, dividers |
-| `--fred-text` | `#212529` | `#E8E6E1` | Primary text |
-| `--fred-text-muted` | `#6c757d` | `#9A9890` | Secondary text, labels |
+| UI Meaning | Fill / dot | Text | Tint background | Border |
+|---|---|---|---|---|
+| Success | `--success` | `--success-light` | `--success-bg` | `--success-border` |
+| Mixed | `--warning` (fills only, fails AA as text) | `--warning-text` | `--warning-bg` | `--warning-border` |
+| Failure | `--error` | `--error` | `--error-bg` | `--error-border` |
+| Not coded / not calculable | `--border` | `--text-muted` | `--surface-alt` | `--border` |
 
-### Chart Colors
-| Variable | Light Mode | Dark Mode | Usage |
-|----------|------------|-----------|-------|
-| `--fred-chart-bg` | `#FFFFFF` | `#2A2E30` | Plotly paper/plot background |
-| `--fred-chart-grid` | `#E5E3D8` | `#3A3E40` | Chart gridlines |
-| `--fred-chart-text` | `#212529` | `#E8E6E1` | Axis labels, titles |
+| Chart Token | Light | Dark | Outcome labels |
+|---|---|---|---|
+| `--color-chart-successful` | `#248073` | `#7ad9b5` | success, successful, successful replication, homogeneous & jointly significant |
+| `--color-chart-failed` | `#c24a33` | `#f08570` | failure, failed, failed replication, informative failure, homogeneous & not significant |
+| `--color-chart-technical-failure` | `#7a2a23` | `#e04f5f` | failure (reversal), not homogeneous & not significant |
+| `--color-chart-failure-partial` | `#d96b27` | `#f4a582` | failure (not homogeneous but jointly significantly above 0) |
+| `--color-chart-mixed` | `#b8841f` | `#e3b657` | mixed |
+| `--color-chart-qualified` | `#7b61a8` | `#c0a8fa` | statistically successful but flawed |
+| `--color-chart-descriptive` | `#5d7186` | `#7a92a8` | descriptive only |
+| `--color-chart-uninformative` | `#a3907a` | `#c2b29c` | OS not significant, uninformative |
+| `--color-chart-not-coded` | `#c3c7ce` | `#5a5f69` | not calculable, not coded (deliberately faint: unassessed) |
+| `--color-chart-original` / `--color-chart-replication` | `#853953` / `#6f7686` | `#d68aa7` / `#a3a9b6` | Forest plot original (circle) and replication (diamond) |
+| `--sig-yes` / `--sig-no` | `#853953` / `#696969` | `#d68aa7` / `#958d92` | Scatterplot significance rugs |
+
+The label → token map lives in `FReD.successCriteria.colorTokens`
+([shared/js/success-criteria.js](shared/js/success-criteria.js)). Never use colour
+alone: every chart pairs colour with legends, labels, or distinct marker shapes.
 
 ---
 
 ## Typography
 
-- **Font Family**: System fonts (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif`)
-- **Base Size**: 16px (1rem)
-- **Line Height**: 1.5
+- **Display:** Domine (headings, card and modal titles, brand name, big numbers)
+- **Body:** Source Sans 3 (everything else)
+- Both are self-hosted in `shared/fonts/` (SIL OFL, licences alongside); declared in `shared/css/fonts.css`.
 
-### Headings
-| Level | Size |
-|-------|------|
-| h1 | 2rem |
-| h2 | 1.75rem |
-| h3 | 1.5rem |
-| h4 | 1.25rem |
-| h5 | 1.125rem |
-| h6 | 1rem |
-
----
-
-## Component Rules
-
-### Cards
-- Background: `var(--fred-bg-card)`
-- Border: `1px solid var(--fred-border)`
-- Border radius: `0.75rem`
-- Shadow: `var(--fred-shadow)`
-- Transition: `0.2s ease` on shadow and background
-
-### Buttons
-- **Primary**: Background `var(--fred-primary)`, white text
-- **Secondary**: Background `var(--fred-bg)`, border `var(--fred-border)`
-- Border radius: `0.25rem`
-- Padding: `0.5rem 1rem`
-
-### Form Controls
-- Background: `var(--fred-bg-card)` (adapts to theme)
-- Border: `1px solid var(--fred-border)`
-- Border radius: `0.25rem`
-- Focus: Border color `var(--fred-primary)` (light) or `var(--fred-accent-teal)` (dark)
-
-### Sidebar Navigation
-- Section titles: Uppercase, `0.75rem`, `var(--fred-text-muted)`
-- Nav links: `0.9375rem`, `500` weight
-- Active state: Background `var(--fred-primary)`, white text
-- Hover state: Background `var(--fred-bg-card)`
-
-### Tabs (Annotator)
-- Light mode active: `var(--fred-primary)` color and border
-- Dark mode active: `var(--fred-accent-teal)` color and border (for visibility)
-
-### Effect Count Badge
-- Label: `0.8125rem`, `var(--fred-text-muted)`
-- Number: `1.25rem`, `700` weight, `var(--fred-accent-teal)`
+| Token | Size | Use |
+|---|---|---|
+| `--fs-9` | clamp(30–46px) | Landing hero title (plum) |
+| `--fs-8` | clamp(24–32px) | Section headings, `h1` |
+| `--fs-7` | clamp(19–21px) | KPI numbers, `h2` |
+| `--fs-6` | 16px | Card / modal titles |
+| `--fs-5` | 14px | Body copy, inputs |
+| `--fs-4` | 13px | Dense UI, buttons, tables |
+| `--fs-3` | 12px | Meta, footer, table headers |
+| `--fs-2` / `--fs-1` | 11 / 10px | Pills, eyebrow labels (uppercase, letter-spaced) |
 
 ---
 
-## Theme Toggle Behavior
+## Shape, elevation, motion
 
-1. **Initialization**: Check `localStorage` for saved preference, fall back to system preference
-2. **Persistence**: Save to `localStorage` key `fred-theme`
-3. **Application**: Set `data-theme` attribute on `<html>` element
-4. **Charts**: Dispatch `themechange` event for Plotly chart re-rendering
-
-### Icon States
-- Light mode (cream background): Show **moon** icon (click to go dark)
-- Dark mode (dark background): Show **sun** icon (click to go light)
+- **Radius by role:** inputs/tags `--radius-sm` (4px), buttons/controls `--radius` (8px), cards/panels/modals `--radius-lg` (14px), chips/pills `--radius-full`. `50%` only for true circles.
+- **Shadows** are plum-tinted: `--shadow-sm` (resting cards), `--shadow-md` (hovered cards), `--shadow-lg` (modals, dropdowns).
+- **Motion:** `--transition-fast` (0.12s) for hovers, `--transition` (0.24s) for larger moves. Everything respects `prefers-reduced-motion`.
+- **Focus:** a 2px `--primary` outline on `:focus-visible` for every interactive element.
 
 ---
 
-## Plotly Chart Theming
+## Components
 
-When creating Plotly charts, use `FReD.themeToggle.getPlotlyLayout()` to get theme-aware colors:
-
-```javascript
-const themeLayout = FReD.themeToggle ? FReD.themeToggle.getPlotlyLayout() : {};
-
-const layout = {
-  paper_bgcolor: themeLayout.paper_bgcolor,
-  plot_bgcolor: themeLayout.plot_bgcolor,
-  font: themeLayout.font,
-  xaxis: {
-    // ... your axis config
-    gridcolor: themeLayout.xaxis?.gridcolor,
-    linecolor: themeLayout.xaxis?.linecolor
-  },
-  // ... etc
-};
-```
-
-### Re-rendering on Theme Change
-Charts should listen for the `themechange` event and re-render:
-
-```javascript
-window.addEventListener('themechange', () => {
-  if (this.lastData) {
-    this.render(this.lastData);
-  }
-});
-```
+- **Top bar** (`.page-header` > `.topbar`): 52px, `--neutral`, FORRT icon tile + two-line name (Domine title, uppercase subtitle), translucent white nav links, theme toggle as a 32px tile.
+- **Footer** (`.footer-bar`): slim `--neutral` strip, 12px text, underlined links.
+- **Cards:** white, `--border-light` border, `--radius-lg`, `--shadow-sm`; header in Domine 16px with a hairline divider.
+- **Buttons:** primary = `--primary` fill; secondary = white with `--border`; outline = transparent with `--border`. 13px, weight 600.
+- **Sidebar nav** (`.sidebar-nav-link`): active row is `--primary-faint` with a 3px `--primary` bar on the left (Atlas list rows), never a solid fill.
+- **Tabs:** muted 600-weight labels; active tab is `--primary` with a 2px inset underline.
+- **KPI band** (`.sidebar-counts`, `.effect-count`): `--primary-faint` strip, Domine plum numbers, uppercase labels.
+- **Badges / outcome pills:** pill radius, tint background + border + text colour from the outcome table.
+- **Alerts:** tint background with a 4px coloured left border.
+- **Tables (DataTables):** `--surface` header with 12px uppercase labels; hairline row dividers; hover and selected rows use `--primary-faint` (selected adds the 3px left bar). DataTables CSS loads **before** `theme.css` so the overrides win.
+- **Modals:** blurred dark backdrop, white `--radius-lg` box, Domine title, `--surface` footer strip.
 
 ---
 
-## Logo
+## Theme toggle
 
-Use the FORRT avatar logo from:
-```
-https://forrt.org/author/forrt/avatar_hu8bc9dda6369ea35e3d2850cf7115c3e5_11296_270x270_fill_q100_h2_lanczos_center_2.webp
-```
+1. On load: saved preference in `localStorage['fred-theme']`, else the system preference.
+2. Applies `data-theme="light|dark"` on `<html>`; dark mode only overrides tokens.
+3. Dispatches a `themechange` event; charts re-render on it.
 
-- Header size: `50px` height, `border-radius: 8px`
-- Landing page hero: `80px` width/height, `border-radius: 12px`
+## ECharts figures (FReD Explorer)
 
----
+Explorer renders every chart with **Apache ECharts 6.1.0** using the **SVG renderer** (`renderer: 'svg'`) via the shared helpers in [`shared/js/charts.js`](shared/js/charts.js) (ported from `forrtproject/flora-explorer` `react-frontend`):
 
-## Shadows
-
-| Variable | Light Mode | Dark Mode |
-|----------|------------|-----------|
-| `--fred-shadow` | `0 2px 8px rgba(63, 5, 8, 0.08)` | `0 2px 8px rgba(0, 0, 0, 0.3)` |
-| `--fred-shadow-lg` | `0 4px 16px rgba(63, 5, 8, 0.12)` | `0 4px 16px rgba(0, 0, 0, 0.4)` |
+- `FReD.charts.finishOption(option, { width })` applies the shared paper ground (`--white`), `--font-body`, top-left circular legend, dark HTML-escaped tooltips, and `prefers-reduced-motion` animation gating.
+- `FReD.charts.valueAxis()`, `categoryAxis()`, `countAxis()`, `stackCorners()`, `labelColor()`, and `horizontalBarHeight()` keep axis and bar styling consistent across views.
+- `FReD.charts.mount(container, spec)` defers initialisation until the container has non-zero width (hidden tabs), redraws on resize and `themechange`, adds `role="img"` + `aria-label`, renders a keyboard-accessible **"View chart data"** `<details>` table underneath, and wires a **"Copy chart CSV"** button (formula-injection safe).
+- `FReD.charts.exportSvg()` and `FReD.charts.exportPng()` provide crisp SVG and 2× PNG downloads for the forest plot.
 
 ---
 
-## Transitions
+## Responsive breakpoints
 
-Standard transition: `var(--fred-transition)` = `0.2s ease`
-
-Apply to:
-- Background color changes
-- Border color changes
-- Box shadow changes
-- Color changes
-
----
-
-## Responsive Breakpoints
-
-| Breakpoint | Usage |
-|------------|-------|
-| `992px` | Sidebar layout collapses to single column |
-| `768px` | Mobile adjustments, card headers stack vertically |
-| `576px` | Reduce base font size to 14px |
-
----
-
-## Dark Mode CSS Pattern
-
-Use the `[data-theme="dark"]` selector for dark mode overrides:
-
-```css
-/* Light mode (default) */
-.my-element {
-  background: var(--fred-bg-card);
-  color: var(--fred-text);
-}
-
-/* Dark mode override (only if needed beyond CSS variables) */
-[data-theme="dark"] .my-element {
-  /* Special dark mode styling */
-}
-```
-
-Most components should work automatically with CSS variables. Only use explicit dark mode selectors for:
-- Third-party components (DataTables)
-- SVG/image adjustments
-- Special visibility requirements (like active tabs)
+| Breakpoint | Change |
+|---|---|
+| `960px` | Sidebar collapses to one column; top bar collapses to a hamburger menu |
+| `768px` | Card headers stack; landing app cells stack |
+| `640px` | Base font 14px; top-bar subtitle hidden; footer stacks |

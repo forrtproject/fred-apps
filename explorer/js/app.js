@@ -65,29 +65,163 @@ FReD.explorer = {
   },
 
   /**
+   * Accessible modal open/close helper with focus trap, Escape/backdrop dismiss,
+   * and focus restoration.
+   */
+  _activeModal: null,
+  _lastFocusedEl: null,
+
+  _setBackgroundInert(inert) {
+    document.querySelectorAll('body > header, body > main, body > footer').forEach(el => {
+      el.inert = !!inert;
+    });
+    document.body.style.overflow = inert ? 'hidden' : '';
+  },
+
+  openModal(modalEl, triggerEl) {
+    if (!modalEl) return;
+    this._lastFocusedEl = triggerEl || null;
+    this._activeModal = modalEl;
+    modalEl.classList.add('active');
+    modalEl.setAttribute('aria-hidden', 'false');
+    this._setBackgroundInert(true);
+    // Force style flush so visibility:visible is active before focusing
+    void modalEl.offsetHeight;
+
+    const focusables = this._getModalFocusables(modalEl);
+    if (focusables.length > 0) {
+      focusables[0].focus();
+    }
+  },
+
+  closeModal(modalEl) {
+    if (!modalEl || !modalEl.classList.contains('active')) return;
+    if (modalEl.id === 'welcome-modal') {
+      const dontShow = document.getElementById('welcome-dont-show');
+      if (dontShow?.checked) {
+        localStorage.setItem('fred-explorer-welcome-dismissed', 'true');
+      }
+    } else if (modalEl.id === 'about-modal') {
+      this.resetCitationCopyState();
+    }
+    modalEl.classList.remove('active');
+    modalEl.setAttribute('aria-hidden', 'true');
+    this._setBackgroundInert(false);
+    if (this._activeModal === modalEl) {
+      this._activeModal = null;
+    }
+    const prev = this._lastFocusedEl;
+    this._lastFocusedEl = null;
+    if (prev && typeof prev.focus === 'function' && document.contains(prev) && prev.offsetParent !== null) {
+      prev.focus();
+    } else if (prev) {
+      // Trigger is hidden (e.g. #about-link inside collapsed mobile #header-nav): return focus to menu toggle if visible
+      const menuBtn = document.getElementById('topbar-menu-btn');
+      if (menuBtn && menuBtn.offsetParent !== null) {
+        menuBtn.focus();
+      } else if (document.activeElement && modalEl.contains(document.activeElement)) {
+        document.body.setAttribute('tabindex', '-1');
+        document.body.focus({ preventScroll: true });
+        document.body.removeAttribute('tabindex');
+      }
+    } else if (document.activeElement && modalEl.contains(document.activeElement)) {
+      // First-run modal without trigger: move sequential focus cursor to top of document so the next Tab reaches .skip-link first
+      document.body.setAttribute('tabindex', '-1');
+      document.body.focus({ preventScroll: true });
+      document.body.removeAttribute('tabindex');
+    }
+  },
+
+  _getModalFocusables(modalEl) {
+    return [...modalEl.querySelectorAll(
+      'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    )].filter(el => el.offsetParent !== null);
+  },
+
+  setupModals() {
+    if (this._modalsBound) return;
+    this._modalsBound = true;
+
+    const welcomeModal = document.getElementById('welcome-modal');
+    const aboutModal = document.getElementById('about-modal');
+
+    document.getElementById('welcome-close-btn')?.addEventListener('click', () => this.closeModal(welcomeModal));
+    document.getElementById('welcome-modal-x')?.addEventListener('click', () => this.closeModal(welcomeModal));
+    document.getElementById('about-close-btn')?.addEventListener('click', () => this.closeModal(aboutModal));
+    document.getElementById('about-modal-close')?.addEventListener('click', () => this.closeModal(aboutModal));
+
+    // Backdrop click closes modal
+    [welcomeModal, aboutModal].forEach(modalEl => {
+      modalEl?.addEventListener('click', (e) => {
+        if (e.target === modalEl) {
+          this.closeModal(modalEl);
+        }
+      });
+    });
+
+    // Global Escape & Tab focus trap while a modal is active
+    document.addEventListener('keydown', (e) => {
+      const modalEl = this._activeModal;
+      if (!modalEl || !modalEl.classList.contains('active')) return;
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        this.closeModal(modalEl);
+        return;
+      }
+      if (e.key === 'Tab') {
+        const focusables = this._getModalFocusables(modalEl);
+        if (focusables.length === 0) return;
+        const first = focusables[0];
+        const last = focusables[focusables.length - 1];
+        if (e.shiftKey && (document.activeElement === first || !modalEl.contains(document.activeElement))) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && (document.activeElement === last || !modalEl.contains(document.activeElement))) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    });
+  },
+
+  /**
    * Initialize welcome modal with "don't show again" functionality
    */
   initWelcomeModal() {
+    this.setupModals();
     const STORAGE_KEY = 'fred-explorer-welcome-dismissed';
     const modal = document.getElementById('welcome-modal');
-    const closeBtn = document.getElementById('welcome-close-btn');
-    const dontShowCheckbox = document.getElementById('welcome-dont-show');
 
-    // Check if user has opted out
     if (localStorage.getItem(STORAGE_KEY) === 'true') {
-      return; // Don't show modal
+      return;
     }
 
-    // Show modal
-    modal.classList.add('active');
+    this.openModal(modal, null);
+  },
 
-    // Handle close button
-    closeBtn?.addEventListener('click', () => {
-      if (dontShowCheckbox?.checked) {
-        localStorage.setItem(STORAGE_KEY, 'true');
-      }
-      modal.classList.remove('active');
-    });
+  _citationCopyAttemptId: 0,
+  _citationCopyResetTimer: null,
+
+  /**
+   * Reset Citation Copy button state and invalidate any in-flight copy feedback
+   */
+  resetCitationCopyState() {
+    this._citationCopyAttemptId += 1;
+    clearTimeout(this._citationCopyResetTimer);
+    this._citationCopyResetTimer = null;
+
+    const copyBtn = document.getElementById('btn-copy-citation');
+    const statusEl = document.getElementById('citation-copy-status');
+    if (copyBtn) {
+      copyBtn.classList.remove('is-copied');
+      const labelEl = copyBtn.querySelector('.citation-copy-label');
+      if (labelEl) labelEl.textContent = 'Copy';
+    }
+    if (statusEl) {
+      statusEl.textContent = '';
+      statusEl.classList.remove('is-error');
+      statusEl.classList.add('visually-hidden');
+    }
   },
 
   /**
@@ -95,19 +229,65 @@ FReD.explorer = {
    */
   async loadCitation() {
     const citationEl = document.getElementById('citation');
+    const copyBtn = document.getElementById('btn-copy-citation');
+    const statusEl = document.getElementById('citation-copy-status');
     if (!citationEl) return;
+
+    if (copyBtn && !copyBtn.dataset.bound) {
+      copyBtn.dataset.bound = 'true';
+      copyBtn.addEventListener('click', async () => {
+        const text = citationEl.textContent.trim();
+        if (!text || copyBtn.disabled) return;
+
+        // Clear any prior feedback/timer and tag this attempt so overlapping or post-close callbacks are ignored
+        this.resetCitationCopyState();
+        const attemptId = this._citationCopyAttemptId;
+        const labelEl = copyBtn.querySelector('.citation-copy-label');
+
+        try {
+          if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') {
+            throw new Error('Clipboard API unavailable');
+          }
+          await navigator.clipboard.writeText(text);
+          if (attemptId !== this._citationCopyAttemptId) return;
+
+          copyBtn.classList.add('is-copied');
+          if (labelEl) labelEl.textContent = 'Copied';
+          if (statusEl) {
+            statusEl.classList.remove('is-error');
+            statusEl.classList.add('visually-hidden');
+            statusEl.textContent = 'Citation copied to clipboard';
+          }
+          this._citationCopyResetTimer = setTimeout(() => {
+            if (attemptId !== this._citationCopyAttemptId) return;
+            this.resetCitationCopyState();
+          }, 2000);
+        } catch (err) {
+          if (attemptId !== this._citationCopyAttemptId) return;
+          console.error('Failed to copy citation:', err);
+          if (statusEl) {
+            statusEl.classList.remove('visually-hidden');
+            statusEl.classList.add('is-error');
+            statusEl.textContent = 'Could not copy automatically. Select the citation text above to copy manually.';
+          }
+        }
+      });
+    }
 
     try {
       const response = await fetch('https://raw.githubusercontent.com/forrtproject/FReD-data/refs/heads/main/output/citation.txt');
       if (response.ok) {
         const citation = await response.text();
         citationEl.textContent = citation.trim();
+        if (copyBtn) copyBtn.disabled = !citation.trim();
       } else {
         citationEl.textContent = 'Citation unavailable.';
+        if (copyBtn) copyBtn.disabled = true;
       }
     } catch (error) {
       console.error('Failed to load citation:', error);
       citationEl.textContent = 'Citation unavailable.';
+      if (copyBtn) copyBtn.disabled = true;
     }
   },
 
@@ -175,12 +355,14 @@ FReD.explorer = {
     this.filteredStudies = FReD.filters.applyFilters(this.allStudies, {
       source: state.source,
       minPower: state.minPower,
+      keepMissingPower: state.keepMissingPower,
       search: state.search
     });
 
-    // Update count displays
+    // Update count displays & power breakdown note
     FReD.filters.updateStudyCount(this.filteredStudies.length, this.allStudies.length);
     FReD.filters.updateReplicationCount(this.filteredStudies, this.allStudies);
+    FReD.filters.updatePowerNote(this.allStudies, state);
 
     // Update success note (depends on filtered studies)
     this.updateSuccessNote(state.criterion);
@@ -210,7 +392,7 @@ FReD.explorer = {
       FReD.charts.trends.renderDecade(this.filteredStudies, criterion);
       FReD.charts.trends.renderDiscipline(this.filteredStudies, criterion);
     } else if (activeTab === 'data') {
-      this.updateFullDataTable();
+      this.updateFullDataTable(criterion);
     }
   },
 
@@ -231,7 +413,7 @@ FReD.explorer = {
         );
 
         if (nonAssessableCount > 0) {
-          noteHtml += `<br><em style="color: var(--fred-text-muted);">For the selected entries, ${nonAssessableCount} of ${successCount} successes cannot be distinguished from reversals (non-directional effect type or missing effect size data).</em>`;
+          noteHtml += `<br><em style="color: var(--text-muted);">For the selected entries, ${nonAssessableCount} of ${successCount} successes cannot be distinguished from reversals (non-directional effect type or missing effect size data).</em>`;
         }
       }
 
@@ -263,13 +445,84 @@ FReD.explorer = {
       });
     });
 
-    // About modal link
-    const aboutLink = document.getElementById('about-link');
-    if (aboutLink) {
-      aboutLink.addEventListener('click', (e) => {
+    // Topbar brand home link (return to Overview on unmodified primary click)
+    const homeLink = document.getElementById('topbar-home-link');
+    if (homeLink) {
+      homeLink.addEventListener('click', (e) => {
+        if (e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
         e.preventDefault();
-        document.getElementById('about-modal')?.classList.add('active');
+        FReD.state.set('tab', 'overview');
+        window.scrollTo(0, 0);
       });
+    }
+
+    // About modal links (header & footer)
+    const aboutModal = document.getElementById('about-modal');
+    ['about-link', 'footer-about-link'].forEach(id => {
+      const link = document.getElementById(id);
+      if (link) {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          this.openModal(aboutModal, link);
+        });
+      }
+    });
+
+    // Mobile topbar menu toggle (<= 960px)
+    const menuBtn = document.getElementById('topbar-menu-btn');
+    const headerNav = document.getElementById('header-nav');
+    if (menuBtn && headerNav) {
+      const closeMenu = (restoreFocus) => {
+        if (!headerNav.classList.contains('open')) return;
+        headerNav.classList.remove('open');
+        menuBtn.setAttribute('aria-expanded', 'false');
+        if (restoreFocus) menuBtn.focus();
+      };
+      menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const isOpen = headerNav.classList.toggle('open');
+        menuBtn.setAttribute('aria-expanded', String(isOpen));
+      });
+      headerNav.addEventListener('click', (e) => {
+        if (e.target.closest('a')) {
+          closeMenu(false);
+        }
+      });
+      document.addEventListener('click', (e) => {
+        if (headerNav.classList.contains('open') && !headerNav.contains(e.target) && !menuBtn.contains(e.target)) {
+          closeMenu(false);
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && headerNav.classList.contains('open')) {
+          e.preventDefault();
+          closeMenu(true);
+        }
+      });
+      headerNav.addEventListener('focusout', () => {
+        setTimeout(() => {
+          if (headerNav.classList.contains('open') && !headerNav.contains(document.activeElement) && document.activeElement !== menuBtn) {
+            closeMenu(false);
+          }
+        }, 0);
+      });
+    }
+
+    // Harden DataTables scrollX header/body width alignment across font loads and resizes
+    if (!this._tableAdjustBound) {
+      this._tableAdjustBound = true;
+      const adjustTables = FReD.utils.debounce(() => {
+        if (this.dataTable && document.getElementById('tab-overview')?.classList.contains('active')) {
+          this.dataTable.columns.adjust();
+        }
+        if (this.fullDataTable && document.getElementById('tab-data')?.classList.contains('active')) {
+          this.fullDataTable.columns.adjust();
+        }
+      }, 120);
+      window.addEventListener('resize', adjustTables);
+      if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(adjustTables);
+      }
     }
   },
 
@@ -282,9 +535,15 @@ FReD.explorer = {
       tab.classList.toggle('active', tab.dataset.tab === tabId);
     });
 
-    // Update sidebar navigation links
+    // Update sidebar navigation links & aria-current
     document.querySelectorAll('.sidebar-nav-link').forEach(link => {
-      link.classList.toggle('active', link.dataset.tab === tabId);
+      const isCurrent = link.dataset.tab === tabId;
+      link.classList.toggle('active', isCurrent);
+      if (isCurrent) {
+        link.setAttribute('aria-current', 'page');
+      } else {
+        link.removeAttribute('aria-current');
+      }
     });
 
     // Update tab content
@@ -292,15 +551,22 @@ FReD.explorer = {
       content.classList.toggle('active', content.id === `tab-${tabId}`);
     });
 
-    // Render tab-specific content
+    // Render tab-specific content and re-adjust DataTables column widths
     const criterion = FReD.state.get('criterion');
-    if (tabId === 'forest') {
+    if (tabId === 'overview') {
+      requestAnimationFrame(() => {
+        if (this.dataTable) this.dataTable.columns.adjust();
+      });
+    } else if (tabId === 'forest') {
       FReD.charts.forestplot.render(this.filteredStudies);
     } else if (tabId === 'correlates') {
       FReD.charts.trends.renderDecade(this.filteredStudies, criterion);
       FReD.charts.trends.renderDiscipline(this.filteredStudies, criterion);
     } else if (tabId === 'data') {
-      this.updateFullDataTable();
+      this.updateFullDataTable(criterion);
+      requestAnimationFrame(() => {
+        if (this.fullDataTable) this.fullDataTable.columns.adjust();
+      });
     }
   },
 
@@ -347,10 +613,15 @@ FReD.explorer = {
       $('#studies-table tbody').off('click', 'td.dt-control').on('click', 'td.dt-control', function() {
         const tr = $(this).closest('tr');
         const row = self.dataTable.row(tr);
+        const btn = $(this).find('.dt-expand-btn')[0];
 
         if (row.child.isShown()) {
           row.child.hide();
           tr.removeClass('shown');
+          if (btn) {
+            btn.setAttribute('aria-expanded', 'false');
+            btn.setAttribute('aria-label', 'Show study details');
+          }
         } else {
           const rowData = row.data();
           const studyIdx = rowData[rowData.length - 1]; // idx is always last
@@ -358,6 +629,10 @@ FReD.explorer = {
           const activeCriterion = FReD.state.get('criterion');
           row.child(self.formatStudyDetails(study, activeCriterion)).show();
           tr.addClass('shown');
+          if (btn) {
+            btn.setAttribute('aria-expanded', 'true');
+            btn.setAttribute('aria-label', 'Hide study details');
+          }
         }
       });
     }
@@ -395,21 +670,25 @@ FReD.explorer = {
           </svg>
           Columns
         </button>
-        <div class="column-selector-dropdown" id="column-selector-dropdown">
+        <div class="column-selector-dropdown" id="column-selector-dropdown" role="region" aria-label="Select visible columns">
           <div class="column-selector-header">
             Select Columns
-            <span class="column-selector-reset" id="column-selector-reset">Reset</span>
+            <button type="button" class="column-selector-reset" id="column-selector-reset">Reset</button>
           </div>
           <div class="column-selector-list">
     `;
 
-    selectableColumns.forEach(col => {
+    selectableColumns.forEach((col, i) => {
       const checked = this.visibleColumns.includes(col.key) ? 'checked' : '';
       html += `
         <div class="column-selector-item" draggable="true" data-column-key="${col.key}">
-          <span class="column-drag-handle" title="Drag to reorder">&#8801;</span>
+          <span class="column-drag-handle" aria-hidden="true" title="Drag to reorder">&#8801;</span>
           <input type="checkbox" id="col-${col.key}" data-column="${col.key}" ${checked}>
           <label for="col-${col.key}">${col.label}</label>
+          <span class="column-move-btns">
+            <button type="button" class="column-move-btn" data-move="up" data-column="${col.key}" aria-label="Move ${col.label} up" ${i === 0 ? 'disabled' : ''}>&#9650;</button>
+            <button type="button" class="column-move-btn" data-move="down" data-column="${col.key}" aria-label="Move ${col.label} down" ${i === selectableColumns.length - 1 ? 'disabled' : ''}>&#9660;</button>
+          </span>
         </div>
       `;
     });
@@ -426,19 +705,41 @@ FReD.explorer = {
     const btn = document.getElementById('column-selector-btn');
     const dropdown = document.getElementById('column-selector-dropdown');
     const resetBtn = document.getElementById('column-selector-reset');
+    btn?.setAttribute('aria-expanded', 'false');
+    btn?.setAttribute('aria-controls', 'column-selector-dropdown');
 
     // Toggle dropdown
     btn?.addEventListener('click', (e) => {
       e.stopPropagation();
-      dropdown.classList.toggle('open');
+      const open = dropdown.classList.toggle('open');
+      btn.setAttribute('aria-expanded', String(open));
     });
 
-    // Close dropdown when clicking outside
-    document.addEventListener('click', (e) => {
-      if (!container.contains(e.target)) {
-        dropdown.classList.remove('open');
-      }
-    });
+    // Close dropdown when clicking outside or pressing Escape (bound once)
+    if (!this._colSelectorDocBound) {
+      this._colSelectorDocBound = true;
+      document.addEventListener('click', (e) => {
+        if (!e.target.isConnected) return;
+        const c = document.getElementById('column-selector-container');
+        const dd = document.getElementById('column-selector-dropdown');
+        const b = document.getElementById('column-selector-btn');
+        if (c && dd && !c.contains(e.target)) {
+          dd.classList.remove('open');
+          b?.setAttribute('aria-expanded', 'false');
+        }
+      });
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          const dd = document.getElementById('column-selector-dropdown');
+          const b = document.getElementById('column-selector-btn');
+          if (dd && dd.classList.contains('open')) {
+            dd.classList.remove('open');
+            b?.setAttribute('aria-expanded', 'false');
+            b?.focus();
+          }
+        }
+      });
+    }
 
     // Handle checkbox changes
     dropdown?.addEventListener('change', (e) => {
@@ -447,10 +748,44 @@ FReD.explorer = {
       }
     });
 
-    // Reset to defaults
-    resetBtn?.addEventListener('click', () => {
+    // Handle keyboard & pointer up/down move buttons without closing the popup
+    dropdown?.addEventListener('click', (e) => {
+      const moveBtn = e.target.closest('.column-move-btn');
+      if (!moveBtn) return;
+      e.stopPropagation();
+      const item = moveBtn.closest('.column-selector-item');
+      if (!item) return;
+      const dir = moveBtn.dataset.move;
+      const colKey = moveBtn.dataset.column;
+      const moved = (dir === 'up' && item.previousElementSibling)
+        ? (item.previousElementSibling.before(item), true)
+        : (dir === 'down' && item.nextElementSibling)
+          ? (item.nextElementSibling.after(item), true)
+          : false;
+      if (!moved) return;
+
+      this.saveColumnOrder();
+      this.setupColumnSelector();
+      document.getElementById('column-selector-dropdown')?.classList.add('open');
+      document.getElementById('column-selector-btn')?.setAttribute('aria-expanded', 'true');
+      const primary = document.querySelector(`.column-move-btn[data-move="${dir}"][data-column="${colKey}"]`);
+      const fallbackDir = dir === 'up' ? 'down' : 'up';
+      const fallback = document.querySelector(`.column-move-btn[data-move="${fallbackDir}"][data-column="${colKey}"]`);
+      if (primary && !primary.disabled) {
+        primary.focus();
+      } else if (fallback && !fallback.disabled) {
+        fallback.focus();
+      }
+    });
+
+    // Reset to defaults (keep popup open and keep focus on Reset button)
+    resetBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
       this.visibleColumns = FReD.columnConfig.resetToDefaults();
       this.setupColumnSelector(); // Rebuild to restore default order
+      document.getElementById('column-selector-dropdown')?.classList.add('open');
+      document.getElementById('column-selector-btn')?.setAttribute('aria-expanded', 'true');
+      document.getElementById('column-selector-reset')?.focus();
       this.rebuildTable();
     });
 
@@ -533,14 +868,25 @@ FReD.explorer = {
   },
 
   /**
-   * Handle column visibility toggle
+   * Handle column visibility toggle (preserves selector order and keeps >= 1 visible column)
    */
   handleColumnToggle(columnKey, isVisible) {
-    if (isVisible && !this.visibleColumns.includes(columnKey)) {
-      this.visibleColumns.push(columnKey);
-    } else if (!isVisible) {
-      this.visibleColumns = this.visibleColumns.filter(k => k !== columnKey);
+    const visibleSet = new Set(this.visibleColumns);
+    if (isVisible) {
+      visibleSet.add(columnKey);
+    } else {
+      if (visibleSet.size <= 1 && visibleSet.has(columnKey)) {
+        const cb = document.getElementById(`col-${columnKey}`);
+        if (cb) cb.checked = true;
+        FReD.utils.showNotification('At least one column must remain visible.', 'info', 2500);
+        return;
+      }
+      visibleSet.delete(columnKey);
     }
+
+    // Keep columns in the selector's canonical order (includes newly added columns not yet in saved order)
+    const order = FReD.columnConfig.getSelectableColumns().map(c => c.key);
+    this.visibleColumns = order.filter(k => visibleSet.has(k));
 
     // Save preference
     FReD.columnConfig.saveVisibleColumns(this.visibleColumns);
@@ -687,7 +1033,7 @@ FReD.explorer = {
   },
 
   /**
-   * Generate CI visualization SVG
+   * Generate CI comparison visualization SVG (shown only when both original & replication CIs exist)
    */
   generateCIVisualization(study) {
     const es_o = study.es_o;
@@ -697,19 +1043,16 @@ FReD.explorer = {
     const ci_lower_r = study.ci_lower_r;
     const ci_upper_r = study.ci_upper_r;
 
-    // Check if we have enough data
+    // Require both CIs so the mini forest comparison is always meaningful
     const hasOriginal = es_o != null && ci_lower_o != null && ci_upper_o != null;
     const hasReplication = es_r != null && ci_lower_r != null && ci_upper_r != null;
 
-    if (!hasOriginal && !hasReplication) {
-      return '<p style="font-size: 0.875rem; color: var(--fred-text-muted);">Insufficient data for visualization</p>';
+    if (!hasOriginal || !hasReplication) {
+      return '<p style="font-size: 0.8125rem; color: var(--text-muted); margin: 0.35rem 0 0 0;">Both original and replication CIs are required for visual comparison.</p>';
     }
 
     // Calculate range for scaling (include 0 always)
-    const allValues = [0];
-    if (hasOriginal) allValues.push(ci_lower_o, ci_upper_o, es_o);
-    if (hasReplication) allValues.push(ci_lower_r, ci_upper_r, es_r);
-
+    const allValues = [0, ci_lower_o, ci_upper_o, es_o, ci_lower_r, ci_upper_r, es_r];
     const minVal = Math.min(...allValues);
     const maxVal = Math.max(...allValues);
     const range = maxVal - minVal || 1;
@@ -718,49 +1061,33 @@ FReD.explorer = {
     const scaleMax = maxVal + padding;
     const scaleRange = scaleMax - scaleMin;
 
-    // SVG dimensions
-    const width = 300;
-    const height = 80;
-    const marginLeft = 10;
-    const marginRight = 10;
+    // Responsive SVG dimensions with clear Original / Replication labels
+    const width = 320;
+    const height = 84;
+    const marginLeft = 72;
+    const marginRight = 14;
     const plotWidth = width - marginLeft - marginRight;
 
-    // Scale function
     const scale = (val) => marginLeft + ((val - scaleMin) / scaleRange) * plotWidth;
     const zeroX = scale(0);
 
-    let svg = `<svg width="${width}" height="${height}" style="display: block; margin-top: 0.5rem;">`;
+    const x1o = scale(ci_lower_o), x2o = scale(ci_upper_o), xPo = scale(es_o);
+    const x1r = scale(ci_lower_r), x2r = scale(ci_upper_r), xPr = scale(es_r);
 
-    // Zero line
-    svg += `<line x1="${zeroX}" y1="10" x2="${zeroX}" y2="70" stroke="#999" stroke-width="1" stroke-dasharray="3,3"/>`;
-    svg += `<text x="${zeroX}" y="78" text-anchor="middle" font-size="10" fill="#666">0</text>`;
-
-    // Original CI (top row, y=25)
-    if (hasOriginal) {
-      const x1 = scale(ci_lower_o);
-      const x2 = scale(ci_upper_o);
-      const xPoint = scale(es_o);
-      svg += `<line x1="${x1}" y1="25" x2="${x2}" y2="25" stroke="#666" stroke-width="2"/>`;
-      svg += `<line x1="${x1}" y1="20" x2="${x1}" y2="30" stroke="#666" stroke-width="2"/>`;
-      svg += `<line x1="${x2}" y1="20" x2="${x2}" y2="30" stroke="#666" stroke-width="2"/>`;
-      svg += `<circle cx="${xPoint}" cy="25" r="5" fill="#666"/>`;
-      svg += `<text x="5" y="28" font-size="10" fill="#666">O</text>`;
-    }
-
-    // Replication CI (bottom row, y=50)
-    if (hasReplication) {
-      const x1 = scale(ci_lower_r);
-      const x2 = scale(ci_upper_r);
-      const xPoint = scale(es_r);
-      svg += `<line x1="${x1}" y1="50" x2="${x2}" y2="50" stroke="var(--fred-primary)" stroke-width="2"/>`;
-      svg += `<line x1="${x1}" y1="45" x2="${x1}" y2="55" stroke="var(--fred-primary)" stroke-width="2"/>`;
-      svg += `<line x1="${x2}" y1="45" x2="${x2}" y2="55" stroke="var(--fred-primary)" stroke-width="2"/>`;
-      svg += `<circle cx="${xPoint}" cy="50" r="5" fill="var(--fred-primary)"/>`;
-      svg += `<text x="5" y="53" font-size="10" fill="var(--fred-primary)">R</text>`;
-    }
-
-    svg += '</svg>';
-    return svg;
+    return `<svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Confidence interval comparison between Original and Replication" style="display: block; margin-top: 0.5rem; width: 100%; max-width: ${width}px; height: auto;">`
+      + `<line x1="${zeroX}" y1="10" x2="${zeroX}" y2="66" style="stroke: var(--text-faint)" stroke-width="1" stroke-dasharray="3,3"/>`
+      + `<text x="${zeroX}" y="79" text-anchor="middle" font-size="10" style="fill: var(--text-muted)">0</text>`
+      + `<text x="${marginLeft - 8}" y="29" text-anchor="end" font-size="11" font-weight="600" style="fill: var(--study-original)">Original</text>`
+      + `<line x1="${x1o}" y1="25" x2="${x2o}" y2="25" style="stroke: var(--study-original)" stroke-width="2"/>`
+      + `<line x1="${x1o}" y1="20" x2="${x1o}" y2="30" style="stroke: var(--study-original)" stroke-width="2"/>`
+      + `<line x1="${x2o}" y1="20" x2="${x2o}" y2="30" style="stroke: var(--study-original)" stroke-width="2"/>`
+      + `<circle cx="${xPo}" cy="25" r="4.5" style="fill: var(--study-original)"/>`
+      + `<text x="${marginLeft - 8}" y="54" text-anchor="end" font-size="11" font-weight="600" style="fill: var(--study-replication)">Replication</text>`
+      + `<line x1="${x1r}" y1="50" x2="${x2r}" y2="50" style="stroke: var(--study-replication)" stroke-width="2"/>`
+      + `<line x1="${x1r}" y1="45" x2="${x1r}" y2="55" style="stroke: var(--study-replication)" stroke-width="2"/>`
+      + `<line x1="${x2r}" y1="45" x2="${x2r}" y2="55" style="stroke: var(--study-replication)" stroke-width="2"/>`
+      + `<polygon points="${xPr},45 ${xPr + 5},50 ${xPr},55 ${xPr - 5},50" style="fill: var(--study-replication)"/>`
+      + '</svg>';
   },
 
   /**
@@ -778,6 +1105,14 @@ FReD.explorer = {
    */
   formatStudyDetails(study, criterion) {
     const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
+    const criterionInfo = FReD.successCriteria.getCriterion(criterion);
+    const criterionLabel = criterionInfo ? criterionInfo.label : criterion;
+
+    const isFiniteNum = (v) => v != null && v !== '' && Number.isFinite(Number(v));
+    const formatCI = (lo, hi) => {
+      if (!isFiniteNum(lo) || !isFiniteNum(hi)) return 'N/A';
+      return `[${FReD.utils.formatNumber(lo, 3)}, ${FReD.utils.formatNumber(hi, 3)}]`;
+    };
 
     // Build replication reference with link
     const repRef = FReD.utils.escapeHtml(study.ref_r || 'N/A');
@@ -795,18 +1130,18 @@ FReD.explorer = {
     claimText = claimText.trim() ? FReD.utils.escapeHtml(claimText.trim()) : null;
     const claimsHtml = claimText ? `
           <div style="margin-bottom: 1rem;">
-            <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">Claim</h5>
+            <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Claim</h5>
             <div style="font-size: 0.875rem;">
               <p style="margin: 0;">${claimText}</p>
             </div>
           </div>` : '';
 
     return `
-      <div class="study-details" style="padding: 1rem; background: var(--fred-bg-alt); border-radius: 4px; margin: 0.5rem;">
+      <div class="study-details" style="padding: 1rem; background: var(--surface); border-radius: 4px; margin: 0.5rem;">
         ${claimsHtml}
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
+        <div class="study-details-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(220px, 100%), 1fr)); gap: 1rem;">
           <div>
-            <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">Effect Sizes</h5>
+            <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Effect Sizes</h5>
             <table style="font-size: 0.875rem;">
               <tr><td style="padding-right: 1rem;"><strong>Original ES (r):</strong></td><td>${FReD.utils.formatNumber(study.es_o, 3) || 'N/A'}</td></tr>
               <tr><td><strong>Replication ES (r):</strong></td><td>${FReD.utils.formatNumber(study.es_r, 3) || 'N/A'}</td></tr>
@@ -815,25 +1150,25 @@ FReD.explorer = {
             </table>
           </div>
           <div>
-            <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">Statistics</h5>
+            <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Statistics</h5>
             <table style="font-size: 0.875rem;">
               <tr><td style="padding-right: 1rem;"><strong>Original p-value:</strong></td><td>${this.formatStudyPValue(study.pval_value_o, study.pval_type_o, study.p_o)}</td></tr>
               <tr><td><strong>Replication p-value:</strong></td><td>${this.formatStudyPValue(study.pval_value_r, study.pval_type_r, study.p_r)}</td></tr>
               <tr><td><strong>Power:</strong></td><td>${FReD.utils.formatNumber(study.power_r, 2) || 'N/A'}</td></tr>
-              <tr><td><strong>Outcome (${criterion}):</strong></td><td>${FReD.utils.capFirstLetter(outcomeReport || 'Not calculable')}</td></tr>
+              <tr><td><strong>Outcome (${FReD.utils.escapeHtml(criterionLabel)}):</strong></td><td>${FReD.utils.capFirstLetter(outcomeReport || 'Not calculable')}</td></tr>
             </table>
           </div>
           <div>
-            <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">Confidence Intervals</h5>
+            <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">Confidence Intervals</h5>
             <table style="font-size: 0.875rem;">
-              <tr><td style="padding-right: 1rem;"><strong>Original CI:</strong></td><td>[${FReD.utils.formatNumber(study.ci_lower_o, 3) || '?'}, ${FReD.utils.formatNumber(study.ci_upper_o, 3) || '?'}]</td></tr>
-              <tr><td><strong>Replication CI:</strong></td><td>[${FReD.utils.formatNumber(study.ci_lower_r, 3) || '?'}, ${FReD.utils.formatNumber(study.ci_upper_r, 3) || '?'}]</td></tr>
+              <tr><td style="padding-right: 1rem;"><strong>Original CI:</strong></td><td>${formatCI(study.ci_lower_o, study.ci_upper_o)}</td></tr>
+              <tr><td><strong>Replication CI:</strong></td><td>${formatCI(study.ci_lower_r, study.ci_upper_r)}</td></tr>
             </table>
             ${this.generateCIVisualization(study)}
           </div>
         </div>
         <div style="margin-top: 1rem;">
-          <h5 style="margin: 0 0 0.5rem 0; color: var(--fred-primary);">References</h5>
+          <h5 style="margin: 0 0 0.5rem 0; color: var(--primary);">References</h5>
           <p style="font-size: 0.875rem; margin: 0 0 0.5rem 0;"><strong>Original:</strong> ${FReD.utils.escapeHtml(study.ref_o || 'N/A')}${origDOI}</p>
           <p style="font-size: 0.875rem; margin: 0;"><strong>Replication:</strong> ${repRef}${repDOI}${repLink}</p>
         </div>
@@ -844,17 +1179,26 @@ FReD.explorer = {
   /**
    * Update the full data table
    */
-  updateFullDataTable() {
-    const tableData = this.filteredStudies.map(study => [
-      FReD.utils.escapeHtml(study.description || ''),
-      FReD.utils.formatNumber(study.es_o, 3),
-      FReD.utils.formatNumber(study.es_r, 3),
-      study.n_o || '',
-      study.n_r || '',
-      FReD.utils.formatNumber(study.power_r, 2),
-      study.result || '',
-      FReD.utils.escapeHtml(study.source || '')
-    ]);
+  updateFullDataTable(criterionArg) {
+    const criterion = criterionArg || FReD.state.get('criterion');
+    const tableData = this.filteredStudies.map((study, idx) => {
+      const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
+      const discipline = study.discipline
+        ? FReD.charts.trends.capitalizeDiscipline(study.discipline)
+        : '';
+      return [
+        FReD.utils.formatReferenceCell(study.ref_o, study.doi_o),
+        FReD.utils.escapeHtml(study.description || ''),
+        FReD.utils.formatNumber(study.es_o, 3),
+        FReD.utils.formatNumber(study.es_r, 3),
+        study.n_o ?? '',
+        study.n_r ?? '',
+        FReD.utils.formatNumber(study.power_r, 2),
+        FReD.utils.escapeHtml(FReD.utils.capFirstLetter(outcomeReport || 'Not calculable')),
+        FReD.utils.escapeHtml(discipline),
+        idx
+      ];
+    });
 
     if (this.fullDataTable) {
       this.fullDataTable.clear();
@@ -864,14 +1208,16 @@ FReD.explorer = {
       this.fullDataTable = $('#full-data-table').DataTable({
         data: tableData,
         columns: [
-          { title: 'Description' },
+          { title: 'Original Reference' },
+          { title: 'Description', className: 'description-cell' },
           { title: 'ES (Orig)' },
           { title: 'ES (Rep)' },
           { title: 'N (Orig)' },
           { title: 'N (Rep)' },
           { title: 'Power' },
           { title: 'Result' },
-          { title: 'Source' }
+          { title: 'Discipline' },
+          { title: 'idx', visible: false, searchable: false }
         ],
         pageLength: 25,
         order: [[0, 'asc']],
@@ -887,65 +1233,70 @@ FReD.explorer = {
    * Setup export buttons
    */
   setupExportButtons() {
-    // Copy button
+    // Copy button (visible columns & active table search)
     document.getElementById('btn-copy')?.addEventListener('click', () => {
       const text = this.getTableText();
       FReD.utils.copyToClipboard(text);
     });
 
-    // CSV button
+    // CSV button (visible columns & active table search; UTF-8 BOM for Excel)
     document.getElementById('btn-csv')?.addEventListener('click', () => {
-      const csv = this.getTableCSV();
-      FReD.utils.downloadFile(csv, `fred-explorer-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
+      const csv = '\uFEFF' + this.getTableCSV();
+      FReD.utils.downloadFile(csv, `fred-explorer-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8');
     });
 
-    // Excel button
-    document.getElementById('btn-excel')?.addEventListener('click', () => {
-      this.downloadExcel();
-    });
-
-    // Download button (full data)
+    // Download CSV button (full dataset tab, respects active table search; UTF-8 BOM for Excel)
     document.getElementById('btn-download')?.addEventListener('click', () => {
-      this.downloadExcel();
+      const csv = '\uFEFF' + this.getFullDatasetCSV();
+      FReD.utils.downloadFile(csv, `fred-explorer-full-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv;charset=utf-8');
     });
   },
 
   /**
-   * Setup reference tooltips
+   * Setup reference tooltips (hover, keyboard focus/Enter/Space, and touch tap)
    */
   setupTooltips() {
-    // Create tooltip element
     const tooltip = document.createElement('div');
     tooltip.className = 'tooltip-popup';
+    tooltip.setAttribute('role', 'dialog');
+    tooltip.setAttribute('aria-label', 'Reference details');
     tooltip.style.display = 'none';
     document.body.appendChild(tooltip);
 
+    const COPY_SVG = '<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>';
+    const LINK_SVG = '<svg aria-hidden="true" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+
     let hideTimeout = null;
     let currentTarget = null;
+    let pinnedByClick = false;
+    let openedByHoverAt = 0;
+    let tooltipGeneration = 0;
 
-    const showTooltip = (target) => {
+    const showTooltip = (target, pinned = false) => {
       if (hideTimeout) {
         clearTimeout(hideTimeout);
         hideTimeout = null;
       }
 
+      tooltipGeneration += 1;
+      const gen = tooltipGeneration;
       currentTarget = target;
+      pinnedByClick = pinned;
       const text = target.dataset.tooltip;
       const link = target.dataset.link;
 
-      // Build tooltip content with buttons
       let html = `<div class="tooltip-text">${FReD.utils.escapeHtml(text)}</div>`;
       html += `<div class="tooltip-actions">`;
-      html += `<button class="tooltip-btn tooltip-copy" title="Copy reference">📋 Copy</button>`;
+      html += `<button type="button" class="tooltip-btn tooltip-copy" title="Copy reference">${COPY_SVG}Copy</button>`;
       if (link) {
-        html += `<a href="${FReD.utils.escapeHtml(link)}" target="_blank" class="tooltip-btn tooltip-link" title="Open paper">🔗 Open</a>`;
+        html += `<a href="${FReD.utils.escapeHtml(link)}" target="_blank" rel="noopener" class="tooltip-btn tooltip-link" title="Open paper">${LINK_SVG}Open</a>`;
       }
+      html += `<span class="visually-hidden tooltip-live" role="status" aria-live="polite"></span>`;
       html += `</div>`;
 
       tooltip.innerHTML = html;
       tooltip.style.display = 'block';
 
-      // Position tooltip
       const rect = target.getBoundingClientRect();
       const tooltipRect = tooltip.getBoundingClientRect();
 
@@ -955,7 +1306,6 @@ FReD.explorer = {
       if (top < 10) {
         top = rect.bottom + 8;
       }
-
       if (left + tooltipRect.width > window.innerWidth - 10) {
         left = window.innerWidth - tooltipRect.width - 10;
       }
@@ -964,40 +1314,122 @@ FReD.explorer = {
       tooltip.style.top = top + 'px';
       tooltip.style.left = left + 'px';
 
-      // Setup copy button
-      tooltip.querySelector('.tooltip-copy')?.addEventListener('click', () => {
+      const copyBtn = tooltip.querySelector('.tooltip-copy');
+      const live = tooltip.querySelector('.tooltip-live');
+      copyBtn?.addEventListener('click', () => {
+        if (!navigator.clipboard || typeof navigator.clipboard.writeText !== 'function') return;
         navigator.clipboard.writeText(text).then(() => {
-          const btn = tooltip.querySelector('.tooltip-copy');
-          btn.textContent = '✓ Copied!';
-          setTimeout(() => { btn.textContent = '📋 Copy'; }, 1500);
+          if (gen !== tooltipGeneration || !tooltip.contains(copyBtn)) return;
+          copyBtn.textContent = 'Copied';
+          setTimeout(() => {
+            if (gen !== tooltipGeneration || !tooltip.contains(copyBtn)) return;
+            copyBtn.innerHTML = `${COPY_SVG}Copy`;
+          }, 1500);
+          if (live && tooltip.contains(live)) {
+            live.textContent = 'Reference copied to clipboard';
+          }
+        }).catch((err) => {
+          console.error('Failed to copy reference:', err);
         });
       });
     };
 
-    const hideTooltip = () => {
-      hideTimeout = setTimeout(() => {
+    const hideTooltip = (immediate) => {
+      if (hideTimeout) clearTimeout(hideTimeout);
+      if (immediate) {
+        tooltipGeneration += 1;
         tooltip.style.display = 'none';
+        tooltip.innerHTML = '';
         currentTarget = null;
+        pinnedByClick = false;
+        return;
+      }
+      if (pinnedByClick) return;
+      const gen = tooltipGeneration;
+      hideTimeout = setTimeout(() => {
+        if (gen !== tooltipGeneration || tooltip.contains(document.activeElement)) return;
+        tooltipGeneration += 1;
+        tooltip.style.display = 'none';
+        tooltip.innerHTML = '';
+        currentTarget = null;
+        pinnedByClick = false;
       }, 150);
     };
 
-    // Show on hover over reference
     document.addEventListener('mouseover', (e) => {
       const target = e.target.closest('.ref-tooltip');
       if (target && target.dataset.tooltip) {
-        showTooltip(target);
+        if (currentTarget !== target || tooltip.style.display !== 'block') {
+          openedByHoverAt = Date.now();
+          showTooltip(target, false);
+        }
       }
     });
 
-    // Hide when leaving reference (with delay)
     document.addEventListener('mouseout', (e) => {
       const target = e.target.closest('.ref-tooltip');
       if (target) {
-        hideTooltip();
+        hideTooltip(false);
       }
     });
 
-    // Keep visible when hovering over tooltip
+    // Touch & click activation + click-outside dismissal
+    document.addEventListener('click', (e) => {
+      const target = e.target.closest('.ref-tooltip');
+      if (target && target.dataset.tooltip) {
+        e.stopPropagation();
+        if (currentTarget === target && tooltip.style.display === 'block') {
+          // On touch (or desktop hover-then-click), promote hover-opened tooltip to pinned instead of immediately closing
+          if (!pinnedByClick || (Date.now() - openedByHoverAt) < 350) {
+            pinnedByClick = true;
+          } else {
+            hideTooltip(true);
+          }
+        } else {
+          showTooltip(target, true);
+        }
+        return;
+      }
+      if (!tooltip.contains(e.target) && tooltip.style.display === 'block') {
+        hideTooltip(true);
+      }
+    });
+
+    // Dismiss floating fixed tooltip on page or inner-table scroll so it never drifts off its trigger
+    window.addEventListener('scroll', () => {
+      if (tooltip.style.display === 'block') hideTooltip(true);
+    }, true);
+
+    // Keyboard activation (Enter/Space), Tab exit back to trigger, and Escape dismissal
+    document.addEventListener('keydown', (e) => {
+      if (tooltip.style.display === 'block' && e.key === 'Escape') {
+        const prev = currentTarget;
+        hideTooltip(true);
+        prev?.focus();
+        return;
+      }
+      if (tooltip.style.display === 'block' && e.key === 'Tab' && tooltip.contains(document.activeElement)) {
+        const focusables = [...tooltip.querySelectorAll('button:not([disabled]), a[href]')];
+        if (focusables.length > 0) {
+          const first = focusables[0];
+          const last = focusables[focusables.length - 1];
+          if ((!e.shiftKey && document.activeElement === last) || (e.shiftKey && document.activeElement === first)) {
+            e.preventDefault();
+            const prev = currentTarget;
+            hideTooltip(true);
+            prev?.focus();
+            return;
+          }
+        }
+      }
+      if ((e.key === 'Enter' || e.key === ' ') && e.target.closest('.ref-tooltip')) {
+        e.preventDefault();
+        const target = e.target.closest('.ref-tooltip');
+        showTooltip(target, true);
+        tooltip.querySelector('.tooltip-copy')?.focus();
+      }
+    });
+
     tooltip.addEventListener('mouseenter', () => {
       if (hideTimeout) {
         clearTimeout(hideTimeout);
@@ -1005,75 +1437,123 @@ FReD.explorer = {
       }
     });
 
-    // Hide when leaving tooltip
     tooltip.addEventListener('mouseleave', () => {
-      hideTooltip();
+      hideTooltip(false);
+    });
+
+    tooltip.addEventListener('focusout', () => {
+      const gen = tooltipGeneration;
+      setTimeout(() => {
+        if (gen !== tooltipGeneration) return;
+        if (!tooltip.contains(document.activeElement) && document.activeElement !== currentTarget) {
+          hideTooltip(true);
+        }
+      }, 50);
     });
   },
 
   /**
-   * Get table data as text
+   * Return studies currently matching the active DataTables search/order,
+   * falling back to all filteredStudies when the table is not initialized.
+   */
+  _getActiveTableStudies(tableInstance) {
+    if (!tableInstance) return this.filteredStudies;
+    const rows = tableInstance.rows({ search: 'applied', order: 'applied' }).data().toArray();
+    return rows
+      .map(row => this.filteredStudies[row[row.length - 1]])
+      .filter(Boolean);
+  },
+
+  /**
+   * Neutralize spreadsheet formula injection in non-numeric text cells.
+   */
+  _neutralizeSpreadsheetFormula(str) {
+    if (/^[=+\-@\t\r]/.test(str) && !/^-?\d+(\.\d+)?([eE][+-]?\d+)?$/.test(str.trim())) {
+      return "'" + str;
+    }
+    return str;
+  },
+
+  /**
+   * Format a single cell for CSV with RFC 4180 quoting and spreadsheet formula neutralization.
+   */
+  _formatCsvCell(val) {
+    if (val === null || val === undefined) return '';
+    if (typeof val === 'number') {
+      return isFinite(val) ? String(val) : '';
+    }
+    const str = this._neutralizeSpreadsheetFormula(String(val));
+    if (/[",\r\n]/.test(str)) {
+      return '"' + str.replace(/"/g, '""') + '"';
+    }
+    return str;
+  },
+
+  /**
+   * Get Effects table data as tab-separated text (respects visible column order & table search)
    */
   getTableText() {
     const criterion = FReD.state.get('criterion');
-    const headers = ['Description', 'Tags', 'Result', 'Original Reference', 'Replication Reference'];
-    const rows = this.filteredStudies.map(study => {
-      const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
-      return [
-        study.description || '',
-        study.tags || '',
-        outcomeReport || 'Not calculable',
-        study.ref_o || '',
-        study.ref_r || ''
-      ].join('\t');
-    });
-    return [headers.join('\t'), ...rows].join('\n');
+    const cols = this.visibleColumns.length > 0 ? this.visibleColumns : FReD.columnConfig.getVisibleColumns();
+    const headers = cols.map(k => FReD.columnConfig.COLUMN_DEFINITIONS[k]?.label || k);
+    const studies = this._getActiveTableStudies(this.dataTable);
+
+    const rows = studies.map(study =>
+      cols.map(k => {
+        const raw = FReD.columnConfig.getPlainValue(study, k, criterion);
+        if (typeof raw === 'number') return isFinite(raw) ? String(raw) : '';
+        const clean = String(raw ?? '').replace(/[\t\r\n]+/g, ' ');
+        return this._neutralizeSpreadsheetFormula(clean);
+      }).join('\t')
+    );
+    return [headers.join('\t'), ...rows].join('\r\n');
   },
 
   /**
-   * Get table data as CSV
+   * Get Effects table data as CSV (respects visible column order & table search)
    */
   getTableCSV() {
     const criterion = FReD.state.get('criterion');
-    const data = this.filteredStudies.map(study => {
-      const { outcomeReport } = FReD.successCriteria.getOutcome(study, criterion);
-      return {
-        description: study.description || '',
-        tags: study.tags || '',
-        result: outcomeReport || 'Not calculable',
-        ref_o: study.ref_o || '',
-        ref_r: study.ref_r || '',
-        es_o: study.es_o,
-        es_r: study.es_r,
-        n_o: study.n_o,
-        n_r: study.n_r,
-        power: study.power_r,
-        source: study.source || ''
-      };
-    });
+    const cols = this.visibleColumns.length > 0 ? this.visibleColumns : FReD.columnConfig.getVisibleColumns();
+    const headers = cols.map(k => FReD.columnConfig.COLUMN_DEFINITIONS[k]?.label || k);
+    const studies = this._getActiveTableStudies(this.dataTable);
 
-    const headers = Object.keys(data[0] || {});
-    const rows = data.map(row =>
-      headers.map(h => {
-        let val = row[h];
-        if (val === null || val === undefined) val = '';
-        val = String(val);
-        if (val.includes(',') || val.includes('"') || val.includes('\n')) {
-          val = '"' + val.replace(/"/g, '""') + '"';
-        }
-        return val;
-      }).join(',')
+    const headerLine = headers.map(h => this._formatCsvCell(h)).join(',');
+    const rows = studies.map(study =>
+      cols.map(k => this._formatCsvCell(FReD.columnConfig.getPlainValue(study, k, criterion))).join(',')
     );
-    return [headers.join(','), ...rows].join('\n');
+    return [headerLine, ...rows].join('\r\n');
   },
 
   /**
-   * Download data as Excel (using CSV for now, could use SheetJS for proper xlsx)
+   * Get full dataset export as CSV (respects sidebar filters & Data tab search)
    */
-  downloadExcel() {
-    const csv = this.getTableCSV();
-    FReD.utils.downloadFile(csv, `fred-explorer-${new Date().toISOString().split('T')[0]}.csv`, 'text/csv');
-    FReD.utils.showNotification('Downloaded as CSV. For Excel format, open the CSV file in Excel.', 'info');
+  getFullDatasetCSV() {
+    const criterion = FReD.state.get('criterion');
+    const studies = this._getActiveTableStudies(this.fullDataTable);
+    const columns = [
+      { header: 'Original Reference', get: s => s.ref_o || '' },
+      { header: 'Replication Reference', get: s => s.ref_r || '' },
+      { header: 'Description', get: s => s.description || '' },
+      { header: 'Tags', get: s => s.tags || '' },
+      { header: 'Discipline', get: s => s.discipline ? FReD.charts.trends.capitalizeDiscipline(s.discipline) : '' },
+      { header: 'Original Year', get: s => s.orig_year ?? '' },
+      { header: 'Original Journal', get: s => s.orig_journal || '' },
+      { header: 'Result', get: s => FReD.utils.capFirstLetter(FReD.successCriteria.getOutcome(s, criterion).outcomeReport || 'Not calculable') },
+      { header: 'ES (Orig)', get: s => (s.es_o != null && s.es_o !== '' && Number.isFinite(Number(s.es_o))) ? Number(s.es_o) : '' },
+      { header: 'ES (Rep)', get: s => (s.es_r != null && s.es_r !== '' && Number.isFinite(Number(s.es_r))) ? Number(s.es_r) : '' },
+      { header: 'N (Orig)', get: s => s.n_o ?? '' },
+      { header: 'N (Rep)', get: s => s.n_r ?? '' },
+      { header: 'Power', get: s => (s.power_r != null && s.power_r !== '' && Number.isFinite(Number(s.power_r))) ? Number(s.power_r) : '' },
+      { header: 'DOI (Orig)', get: s => s.doi_o || '' },
+      { header: 'DOI (Rep)', get: s => s.doi_r || '' }
+    ];
+
+    const headerLine = columns.map(c => this._formatCsvCell(c.header)).join(',');
+    const rows = studies.map(study =>
+      columns.map(c => this._formatCsvCell(c.get(study))).join(',')
+    );
+    return [headerLine, ...rows].join('\r\n');
   }
 };
 

@@ -6,35 +6,40 @@
   <title>FReD Explorer - FORRT Replication Database</title>
   <link rel="icon" type="image/png" href="../shared/images/favicon.png">
 
-  <!-- Stylesheets -->
-  <link rel="stylesheet" href="../shared/css/theme.css">
-
-  <!-- DataTables CSS -->
+  <!-- DataTables CSS (vendor first so the theme overrides it) -->
   <link rel="stylesheet" href="https://cdn.datatables.net/1.13.7/css/jquery.dataTables.min.css">
   <link rel="stylesheet" href="https://cdn.datatables.net/buttons/2.4.2/css/buttons.dataTables.min.css">
 
-  <!-- App CSS (after DataTables to allow overrides) -->
+  <!-- Stylesheets -->
+  <link rel="stylesheet" href="../shared/css/theme.css">
+
+  <!-- App CSS -->
   <link rel="stylesheet" href="css/explorer.css">
 
-  <!-- Plotly -->
-  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+  <!-- Apache ECharts 6.1.0 (SVG renderer, pinned to match flora-explorer) -->
+  <script src="https://cdn.jsdelivr.net/npm/echarts@6.1.0/dist/echarts.min.js"></script>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to main content</a>
   <!-- Header -->
   <header class="page-header">
-    <div class="container">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <div style="display: flex; align-items: center; gap: 1rem;">
-          <img src="../shared/images/fred-logo-inverted.png" alt="FReD Logo" style="height: 50px; border-radius: 8px;">
-          <div>
-            <h1 style="margin: 0;">FReD Explorer</h1>
-            <p style="margin: 0; opacity: 0.9; font-size: 0.9rem;">Explore the FORRT Replication Database</p>
+    <div class="topbar">
+        <a href="./?tab=overview" class="topbar-brand" id="topbar-home-link">
+          <span class="topbar-icon"><img src="../shared/images/forrt.svg" alt="FORRT logo" width="20" height="20"></span>
+          <div class="topbar-name">
+            <span class="topbar-title">FReD Explorer</span>
+            <span>FORRT Replication Database</span>
           </div>
-        </div>
-        <nav class="header-nav">
-          <a href="#" class="header-nav-link" id="about-link">About</a>
-          <a href="https://forrt.org/flora-replication-atlas/" class="header-nav-link" target="_blank" rel="noopener">Replication Atlas</a>
-          <button class="theme-toggle" title="Toggle dark/light mode">
+        </a>
+        <button class="topbar-menu-btn" id="topbar-menu-btn" type="button" aria-label="Toggle navigation menu" aria-expanded="false" aria-controls="header-nav">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <nav class="header-nav" id="header-nav" data-collapsible="true" aria-label="Primary">
+          <button class="theme-toggle" type="button" title="Toggle dark/light mode" aria-label="Toggle dark/light mode">
             <svg class="icon-moon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
             </svg>
@@ -50,31 +55,35 @@
               <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
             </svg>
           </button>
+          <a href="#" class="header-nav-link" id="about-link">About</a>
+          <a href="https://forrt.org/flora-replication-atlas/" class="header-nav-link" target="_blank" rel="noopener">Replication Atlas</a>
+          <a href="https://forrt.org/flora-explorer/" class="header-nav-link" target="_blank" rel="noopener">FLoRA Explorer</a>
+          <a href="https://docs.google.com/forms/d/e/1FAIpQLSeMCwdtP0TPgL55stniuyyTxnNwyC34mO4VUuLcQwYrLI89sQ/viewform" class="topbar-cta" target="_blank" rel="noreferrer">Add Missing Study</a>
         </nav>
-      </div>
     </div>
   </header>
 
   <!-- Main Content -->
-  <main class="container">
+  <main class="container" id="main-content">
+    <h1 class="visually-hidden">FReD Explorer</h1>
     <div class="sidebar-layout">
       <!-- Sidebar -->
       <aside class="sidebar">
         <!-- Navigation -->
-        <nav class="sidebar-nav">
+        <nav class="sidebar-nav" aria-label="Explorer sections">
           <div class="sidebar-nav-title">Navigation</div>
           <ul class="sidebar-nav-list">
             <li class="sidebar-nav-item">
-              <button class="sidebar-nav-link active" data-tab="overview">Overview</button>
+              <button type="button" class="sidebar-nav-link active" data-tab="overview" aria-current="page">Overview</button>
             </li>
             <li class="sidebar-nav-item">
-              <button class="sidebar-nav-link" data-tab="forest">Forest Plot</button>
+              <button type="button" class="sidebar-nav-link" data-tab="forest">Forest Plot</button>
             </li>
             <li class="sidebar-nav-item">
-              <button class="sidebar-nav-link" data-tab="correlates">Correlates</button>
+              <button type="button" class="sidebar-nav-link" data-tab="correlates">Correlates</button>
             </li>
             <li class="sidebar-nav-item">
-              <button class="sidebar-nav-link" data-tab="data">Data</button>
+              <button type="button" class="sidebar-nav-link" data-tab="data">Data</button>
             </li>
           </ul>
         </nav>
@@ -92,8 +101,13 @@
           <!-- Minimum Power -->
           <div class="form-group">
             <label class="form-label" for="minpower">Minimum Power</label>
-            <input type="range" id="minpower" class="form-range" min="0.05" max="0.999" step="0.01" value="0.05">
+            <input type="range" id="minpower" class="form-range" min="0.05" max="0.99" step="0.01" value="0.05" aria-valuetext="5%">
             <div class="range-value" id="minpower-value">5%</div>
+            <label class="power-missing-toggle" for="keep-missing-power">
+              <input type="checkbox" id="keep-missing-power" checked>
+              <span>Keep studies with missing power</span>
+            </label>
+            <div class="power-filter-note" id="power-filter-note" aria-live="polite"></div>
           </div>
 
           <!-- Success Criterion - now a dropdown -->
@@ -142,9 +156,15 @@
         <div class="tab-content active" id="tab-overview">
           <!-- Outcome Distribution - at the top -->
           <div class="card">
-            <div class="card-header" style="display: block;"><strong>Outcome Distribution</strong> <span id="outcome-count" style="font-weight: normal;"></span></div>
-            <div class="card-body" style="padding: 0.5rem 1rem;">
-              <div id="barchart" style="height: 80px;"></div>
+            <div class="card-header chart-card-header">
+              <div class="chart-card-title">
+                <span>Outcome Distribution</span>
+                <span id="outcome-count" class="chart-card-meta"></span>
+              </div>
+              <div class="chart-card-actions" id="barchart-actions"></div>
+            </div>
+            <div class="card-body card-body--compact">
+              <div id="barchart"></div>
             </div>
           </div>
 
@@ -153,25 +173,30 @@
 
           <!-- Scatterplot -->
           <div class="card">
-            <div class="card-header">Effect Size Comparison</div>
+            <div class="card-header chart-card-header">
+              <div class="chart-card-title">
+                <span>Effect Size Comparison</span>
+                <span id="scatterplot-count" class="chart-card-meta"></span>
+              </div>
+              <div class="chart-card-actions" id="scatterplot-actions"></div>
+            </div>
             <div class="card-body">
               <div class="plot-container" id="scatterplot"></div>
-              <p class="text-muted text-center" style="margin-top: 0.5rem; font-size: 0.875rem;">
-                Rug plots: <span style="color: #4DCCD0;">teal</span> = significant, <span style="color: #FA948C;">coral</span> = not significant
+              <p class="rug-legend" id="scatterplot-rug-legend">
+                Rug plots: <span class="rug-legend-yes">plum</span> = significant, <span class="rug-legend-no">grey</span> = not significant
               </p>
             </div>
           </div>
 
           <!-- Data Table -->
-          <div class="card">
+          <div class="card card--allow-overflow">
             <div class="card-header">
               Effects
-              <div style="display: flex; align-items: center; gap: 0.5rem; margin-left: auto;">
+              <div class="card-header-tools">
                 <div id="column-selector-container"></div>
                 <div class="btn-group">
-                  <button class="btn btn-sm btn-secondary" id="btn-copy">Copy</button>
-                  <button class="btn btn-sm btn-secondary" id="btn-csv">CSV</button>
-                  <button class="btn btn-sm btn-secondary" id="btn-excel">Excel</button>
+                  <button type="button" class="btn btn-sm btn-secondary" id="btn-copy">Copy</button>
+                  <button type="button" class="btn btn-sm btn-secondary" id="btn-csv">CSV</button>
                 </div>
               </div>
             </div>
@@ -187,26 +212,45 @@
         <!-- Tab Content: Forest Plot -->
         <div class="tab-content" id="tab-forest">
           <div class="card">
-            <div class="card-header">Forest Plot</div>
+            <div class="card-header chart-card-header">
+              <span>Forest Plot</span>
+              <div class="chart-card-actions" id="forestplot-actions"></div>
+            </div>
             <div class="card-body">
-              <div class="plot-container" id="forestplot" style="min-height: 600px;"></div>
+              <div class="plot-container" id="forestplot"></div>
             </div>
           </div>
         </div>
 
         <!-- Tab Content: Correlates -->
         <div class="tab-content" id="tab-correlates">
+          <div class="correlates-toolbar">
+            <span class="correlates-toolbar-label" id="correlates-mode-label">Show outcomes as</span>
+            <div class="segmented-toggle" role="group" aria-labelledby="correlates-mode-label">
+              <button type="button" class="segmented-toggle-btn active" data-correlates-mode="totals" aria-pressed="true">Totals</button>
+              <button type="button" class="segmented-toggle-btn" data-correlates-mode="shares" aria-pressed="false">Shares (%)</button>
+            </div>
+          </div>
           <div class="card">
-            <div class="card-header">Outcomes by Decade</div>
+            <div class="card-header chart-card-header">
+              <div class="chart-card-title">
+                <span>Outcomes by Decade</span>
+                <span id="decade-count" class="chart-card-meta"></span>
+              </div>
+              <div class="chart-card-actions" id="decade-chart-actions"></div>
+            </div>
             <div class="card-body">
               <div class="plot-container" id="decade-chart"></div>
             </div>
           </div>
 
           <div class="card">
-            <div class="card-header">Outcomes by Discipline</div>
+            <div class="card-header chart-card-header">
+              <span>Outcomes by Discipline</span>
+              <div class="chart-card-actions" id="discipline-chart-actions"></div>
+            </div>
             <div class="card-body">
-              <div class="plot-container" id="discipline-chart" style="min-height: 400px;"></div>
+              <div class="plot-container" id="discipline-chart"></div>
             </div>
           </div>
         </div>
@@ -216,12 +260,13 @@
           <div class="card">
             <div class="card-header">
               Full Dataset
-              <button class="btn btn-sm btn-primary" id="btn-download" style="float: right;">Download Excel</button>
+              <button type="button" class="btn btn-sm btn-primary" id="btn-download" style="float: right;">Download CSV</button>
             </div>
             <div class="card-body">
               <table id="full-data-table" class="display" style="width:100%">
                 <thead>
                   <tr>
+                    <th>Original Reference</th>
                     <th>Description</th>
                     <th>ES (Orig)</th>
                     <th>ES (Rep)</th>
@@ -229,7 +274,7 @@
                     <th>N (Rep)</th>
                     <th>Power</th>
                     <th>Result</th>
-                    <th>Source</th>
+                    <th>Discipline</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -243,11 +288,11 @@
   </main>
 
   <!-- About Modal -->
-  <div class="modal-overlay" id="about-modal">
+  <div class="modal-overlay" id="about-modal" role="dialog" aria-modal="true" aria-labelledby="about-modal-title" aria-hidden="true">
     <div class="modal" style="max-width: 700px;">
       <div class="modal-header">
-        <h3>About FReD Explorer</h3>
-        <button class="modal-close" onclick="document.getElementById('about-modal').classList.remove('active')">&times;</button>
+        <h3 id="about-modal-title">About FReD Explorer</h3>
+        <button type="button" class="modal-close" id="about-modal-close" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
         <p>
@@ -271,8 +316,21 @@
 
         <p><a href="https://forrt.org/fred/articles/success_criteria.html" target="_blank">Learn more about success criteria &rarr;</a></p>
 
-        <h4>Citation</h4>
-        <p id="citation" class="text-muted">Loading citation...</p>
+        <div class="citation-header">
+          <h4>Citation</h4>
+          <button type="button" class="btn btn-sm btn-secondary citation-copy-btn" id="btn-copy-citation" disabled aria-label="Copy citation to clipboard">
+            <svg class="icon-copy" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            <svg class="icon-check" aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="20 6 9 17 4 12"></polyline>
+            </svg>
+            <span class="citation-copy-label">Copy</span>
+          </button>
+        </div>
+        <p id="citation" class="text-muted citation-scroll" tabindex="0" role="region" aria-label="Dataset citation">Loading citation...</p>
+        <p class="citation-copy-status visually-hidden" id="citation-copy-status" role="status" aria-live="polite"></p>
 
         <h4>Links</h4>
         <ul>
@@ -282,27 +340,30 @@
         </ul>
       </div>
       <div class="modal-footer">
-        <button class="btn btn-primary" onclick="document.getElementById('about-modal').classList.remove('active')">Close</button>
+        <button type="button" class="btn btn-primary" id="about-close-btn">Close</button>
       </div>
     </div>
   </div>
 
   <!-- Footer -->
-  <footer style="background: var(--fred-bg-alt); padding: 1rem 0; margin-top: 2rem; text-align: center; color: var(--fred-text-muted);">
-    <div class="container">
-      <p>FReD Explorer | <a href="https://forrt.org" target="_blank">FORRT</a> | Data last updated: <span id="data-updated">Loading...</span></p>
-      <p style="font-size: 0.85rem; margin-top: 0.5rem;">
+  <footer class="footer-bar footer-bar--full">
+    <div class="footer-bar-inner">
+      <span><a href="https://forrt.org" target="_blank" rel="noopener">FORRT</a> &middot; FReD Explorer &middot; Data last updated: <span id="data-updated">Loading...</span></span>
+      <div class="footer-bar-links">
+        <a href="#" id="footer-about-link">About</a>
+        <a href="https://forrt.org/flora-replication-atlas/" target="_blank" rel="noopener">Replication Atlas</a>
+        <a href="https://forrt.org/flora-explorer/" target="_blank" rel="noopener">FLoRA Explorer</a>
         <a href="mailto:lukas.roeseler@uni-muenster.de?subject=FReD%20Explorer%20Feedback%20%2F%20Issue%20Report&body=Please%20describe%20your%20feedback%20or%20issue%20below%3A%0A%0A---%0A%0AIf%20reporting%20a%20data%20issue%2C%20please%20include%3A%0A-%20The%20DOI(s)%20or%20references%20affected%0A-%20What%20appears%20to%20be%20incorrect%0A-%20The%20correct%20information%20(if%20known)%0A-%20Source%2Freference%20for%20the%20correction">Share feedback / Report an issue</a>
-      </p>
+      </div>
     </div>
   </footer>
 
   <!-- Welcome Modal -->
-  <div class="modal-overlay" id="welcome-modal">
+  <div class="modal-overlay" id="welcome-modal" role="dialog" aria-modal="true" aria-labelledby="welcome-modal-title" aria-hidden="true">
     <div class="modal">
       <div class="modal-header">
-        <h3>Welcome to FReD Explorer</h3>
-        <button class="modal-close" onclick="document.getElementById('welcome-modal').classList.remove('active')">&times;</button>
+        <h3 id="welcome-modal-title">Welcome to FReD Explorer</h3>
+        <button type="button" class="modal-close" id="welcome-modal-x" aria-label="Close">&times;</button>
       </div>
       <div class="modal-body">
         <p>
@@ -310,7 +371,7 @@
           analyze replication studies across psychology and related fields.
         </p>
         <p>
-          Use the filters on the left to narrow down studies.
+          Use the filters to narrow down studies.
           Select different success criteria to see how outcomes vary based on
           different definitions of replication success.
         </p>
@@ -342,6 +403,7 @@
   <script src="../shared/js/theme-toggle.js"></script>
   <script src="../shared/js/success-criteria.js"></script>
   <script src="../shared/js/data-loader.js"></script>
+  <script src="../shared/js/charts.js"></script>
   <script src="js/state.js"></script>
   <script src="js/filters.js"></script>
   <script src="js/column-config.js"></script>

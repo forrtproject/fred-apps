@@ -10,31 +10,22 @@ window.FReD = window.FReD || {};
 FReD.reportGenerator = {
   outcomeCaveat: 'Labels follow how the replication authors describe their own results, and they do not say why a replication failed. Chance, low power, flaws in the replication, or differences in sample and setting can all produce a failure, so one failed replication does not show that the original finding was false. Follow the links to the reports before relying on a label.',
 
-  // Outcome symbols - using text characters that respond to CSS color
-  // Note: getSymbol() method provides theme-aware symbols
+  // Outcome symbols - text characters coloured by the .result-* classes in
+  // annotator.css (which follow the theme). The inline colours are light-theme
+  // fallbacks so a copied report keeps its colours outside the app.
   symbols: {
-    success: { html: '<span style="color: #166534;">&#x2714;</span>', text: '[Re]' },  // ✔
-    failure: { html: '<span style="color: #991B1B;">&#x2716;</span>', text: '[¬Re]' },  // ✖
-    mixed: { html: '<span style="color: #A16207; font-weight: bold;">?</span>', text: '[?Re]' },  // Plain ?
-    inconclusive: { html: '<span style="color: #666;">~</span>', text: '[?]' },
-    not_coded: { html: '<span style="color: #666;">&#x270F;</span>', text: '[NC]' }  // ✏
+    success: { html: '<span class="result-success" style="color: #15803d;">&#x2714;</span>', text: '[Re]' },  // ✔
+    failure: { html: '<span class="result-failure" style="color: #b42318;">&#x2716;</span>', text: '[¬Re]' },  // ✖
+    mixed: { html: '<span class="result-mixed" style="color: #8c6708; font-weight: bold;">?</span>', text: '[?Re]' },  // Plain ?
+    inconclusive: { html: '<span class="result-na" style="color: #5c5c5c;">~</span>', text: '[?]' },
+    not_coded: { html: '<span class="result-na" style="color: #5c5c5c;">&#x270F;</span>', text: '[NC]' }  // ✏
   },
 
   /**
-   * Get symbol with theme-aware styling
+   * Get symbol for an outcome key
    */
   getSymbol(key) {
-    const symbol = this.symbols[key] || this.symbols.not_coded;
-    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
-
-    if (key === 'mixed') {
-      // In light mode, add visible outline for visibility; in dark mode, use brighter yellow
-      const style = isDark
-        ? 'color: #EAB308; font-weight: bold;'  // Brighter yellow for dark mode
-        : 'color: #A16207; font-weight: bold; text-shadow: -0.5px -0.5px 0 #000, 0.5px -0.5px 0 #000, -0.5px 0.5px 0 #000, 0.5px 0.5px 0 #000;';  // Black outline for light mode
-      return { html: `<span style="${style}">?</span>`, text: symbol.text };
-    }
-    return symbol;
+    return this.symbols[key] || this.symbols.not_coded;
   },
 
   /**
@@ -152,7 +143,7 @@ FReD.reportGenerator = {
     if (retractedDOIs.size > 0) {
       html += `
         <h2>Retracted Articles</h2>
-        <p style="color: #991B1B;"><strong>Warning:</strong> The following ${retractedDOIs.size} article(s) from your reference list have been retracted:</p>
+        <p class="retracted-warning-text" style="color: #b42318;"><strong>Warning:</strong> The following ${retractedDOIs.size} article(s) from your reference list have been retracted:</p>
         <ul>
       `;
 
@@ -172,7 +163,7 @@ FReD.reportGenerator = {
           <span class="retraction-badge">RETRACTED</span>
           <a href="https://doi.org/${doi}" target="_blank">${doi}</a>
           ${info.title ? `- ${FReD.utils.escapeHtml(info.title)}` : ''}
-          ${retractionDetails ? `<br><small style="color: #666;">${FReD.utils.escapeHtml(retractionDetails)}</small>` : ''}
+          ${retractionDetails ? `<br><small class="text-muted" style="color: #5c5c5c;">${FReD.utils.escapeHtml(retractionDetails)}</small>` : ''}
         </li>`;
       });
 

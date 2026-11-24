@@ -70,72 +70,113 @@ FReD.successCriteria = {
     }
   },
 
-  // Color mapping for outcomes
-  colors: {
+  // Outcome -> chart series design token (CSS custom property in shared/css/theme.css).
+  // Uses the flora-explorer --color-chart-* palette, resolved at render time so every
+  // chart follows the active light/dark theme.
+  colorTokens: {
     // Common outcomes
-    'success': '#8FBC8F',
-    'Success': '#8FBC8F',
-    'failure': '#FF7F7F',
-    'Failure': '#FF7F7F',
-    'failure (reversal)': 'darkred',
-    'Failure (reversal)': 'darkred',
-    'OS not significant': '#D3D3D3',
-    'Not calculable': '#C8C8C8',
-    'not calculable': '#C8C8C8',
+    'success': '--color-chart-successful',
+    'Success': '--color-chart-successful',
+    'successful replication': '--color-chart-successful',
+    'Successful replication': '--color-chart-successful',
+    'failure': '--color-chart-failed',
+    'Failure': '--color-chart-failed',
+    'failed replication': '--color-chart-failed',
+    'Failed replication': '--color-chart-failed',
+    'failure (reversal)': '--color-chart-technical-failure',
+    'Failure (reversal)': '--color-chart-technical-failure',
+    'OS not significant': '--color-chart-uninformative',
+    'os not significant': '--color-chart-uninformative',
+    'Not calculable': '--color-chart-not-coded',
+    'not calculable': '--color-chart-not-coded',
+    'not coded': '--color-chart-not-coded',
+    'Not coded': '--color-chart-not-coded',
 
     // Reported success outcomes (from FReD/FLoRA)
-    'successful': '#8FBC8F',
-    'Successful': '#8FBC8F',
-    'successful replication': '#8FBC8F',
-    'Successful replication': '#8FBC8F',
-    'failed': '#FF7F7F',
-    'Failed': '#FF7F7F',
-    'failed replication': '#FF7F7F',
-    'Failed replication': '#FF7F7F',
-    'mixed': '#FFD700',
-    'Mixed': '#FFD700',
-    'informative failure': '#FF7F7F',
-    'Informative failure': '#FF7F7F',
-    'uninformative': '#D3D3D3',
-    'Uninformative': '#D3D3D3',
-    'descriptive only': '#B0C4DE',
-    'Descriptive only': '#B0C4DE',
-    'statistically successful but flawed': '#d88201',
-    'Statistically successful but flawed': '#d88201',
+    'successful': '--color-chart-successful',
+    'Successful': '--color-chart-successful',
+    'failed': '--color-chart-failed',
+    'Failed': '--color-chart-failed',
+    'mixed': '--color-chart-mixed',
+    'Mixed': '--color-chart-mixed',
+    'informative failure': '--color-chart-failed',
+    'Informative failure': '--color-chart-failed',
+    'uninformative': '--color-chart-uninformative',
+    'Uninformative': '--color-chart-uninformative',
+    'descriptive only': '--color-chart-descriptive',
+    'Descriptive only': '--color-chart-descriptive',
+    'statistically successful but flawed': '--color-chart-qualified',
+    'Statistically successful but flawed': '--color-chart-qualified',
 
     // Homogeneity & significance specific (supports both legacy "above 0" and
     // direction-neutral "different from 0" / opposite-direction labels from FReD;
-    // reserves "darkred" strictly for reversals / opposite-direction failures)
-    'success (homogeneous and jointly significantly above 0)': '#8FBC8F',
-    'Success (homogeneous and jointly significantly above 0)': '#8FBC8F',
-    'success (homogeneous and jointly significantly different from 0)': '#8FBC8F',
-    'Success (homogeneous and jointly significantly different from 0)': '#8FBC8F',
-    'failure (not homogeneous but jointly significantly above 0)': '#efa986',
-    'Failure (not homogeneous but jointly significantly above 0)': '#efa986',
-    'failure (not homogeneous but jointly significantly different from 0)': '#efa986',
-    'Failure (not homogeneous but jointly significantly different from 0)': '#efa986',
-    'failure (homogeneous but jointly significant in opposite direction)': 'darkred',
-    'Failure (homogeneous but jointly significant in opposite direction)': 'darkred',
-    'failure (not homogeneous and jointly significant in opposite direction)': 'darkred',
-    'Failure (not homogeneous and jointly significant in opposite direction)': 'darkred',
-    'failure (not homogeneous and not significant)': '#CD5C5C',
-    'Failure (not homogeneous and not significant)': '#CD5C5C',
-    'failure (homogeneous but not significant)': '#FF7F7F',
-    'Failure (homogeneous but not significant)': '#FF7F7F'
+    // reserves --color-chart-technical-failure strictly for reversals / opposite-direction failures)
+    'success (homogeneous and jointly significantly above 0)': '--color-chart-successful',
+    'Success (homogeneous and jointly significantly above 0)': '--color-chart-successful',
+    'success (homogeneous and jointly significantly different from 0)': '--color-chart-successful',
+    'Success (homogeneous and jointly significantly different from 0)': '--color-chart-successful',
+    'failure (not homogeneous but jointly significantly above 0)': '--color-chart-failure-partial',
+    'Failure (not homogeneous but jointly significantly above 0)': '--color-chart-failure-partial',
+    'failure (not homogeneous but jointly significantly different from 0)': '--color-chart-failure-partial',
+    'Failure (not homogeneous but jointly significantly different from 0)': '--color-chart-failure-partial',
+    'failure (homogeneous but jointly significant in opposite direction)': '--color-chart-technical-failure',
+    'Failure (homogeneous but jointly significant in opposite direction)': '--color-chart-technical-failure',
+    'failure (not homogeneous and jointly significant in opposite direction)': '--color-chart-technical-failure',
+    'Failure (not homogeneous and jointly significant in opposite direction)': '--color-chart-technical-failure',
+    'failure (not homogeneous and not significant)': '--color-chart-failure-severe',
+    'Failure (not homogeneous and not significant)': '--color-chart-failure-severe',
+    'failure (homogeneous but not significant)': '--color-chart-failed',
+    'Failure (homogeneous but not significant)': '--color-chart-failed'
   },
 
   // Rug plot colors (significance indicators)
-  rugColors: {
-    significant: '#4DCCD0',
-    notSignificant: '#FA948C'
+  rugColorTokens: {
+    significant: '--sig-yes',
+    notSignificant: '--sig-no'
+  },
+
+  _resolved: null,
+  _resolvedTheme: null,
+
+  _resolve(map) {
+    const out = {};
+    const style = getComputedStyle(document.documentElement);
+    Object.keys(map).forEach(key => {
+      const token = map[key];
+      out[key] = style.getPropertyValue(token).trim();
+    });
+    return out;
+  },
+
+  _refresh() {
+    const theme = document.documentElement.getAttribute('data-theme') || 'light';
+    if (!this._resolved || this._resolvedTheme !== theme) {
+      this._resolved = {
+        colors: this._resolve(this.colorTokens),
+        rug: this._resolve(this.rugColorTokens)
+      };
+      this._resolvedTheme = theme;
+    }
+    return this._resolved;
+  },
+
+  /** Outcome label -> colour for the active theme */
+  get colors() {
+    return this._refresh().colors;
+  },
+
+  /** Significance rug colours for the active theme */
+  get rugColors() {
+    return this._refresh().rug;
   },
 
   /**
-   * Get color for an outcome label
+   * Get color for an outcome label (case-insensitive)
    */
   getColor(outcome) {
-    if (!outcome) return this.colors['Not calculable'];
-    return this.colors[outcome] || this.colors[outcome.toLowerCase()] || this.colors['Not calculable'];
+    const colors = this.colors;
+    if (!outcome) return colors['Not calculable'];
+    return colors[outcome] || colors[String(outcome).toLowerCase()] || colors['Not calculable'];
   },
 
   /**
